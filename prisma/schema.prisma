@@ -1,0 +1,121 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Bowling {
+  id          Int          @id @default(autoincrement())
+  name        String
+  tournaments Tournament[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@map("bowling")
+}
+
+model Tournament {
+  id        Int       @id @default(autoincrement())
+  name      String
+  bowlingId Int
+  bowling   Bowling   @relation(fields: [bowlingId], references: [id])
+  sessions  Session[]
+  teams     Team[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("tournaments")
+}
+
+model Team {
+  id           Int          @id @default(autoincrement())
+  tournamentId Int
+  name         String
+  laneId       Int?         // Lane assigned to this team for the tournament
+  tournament   Tournament   @relation(fields: [tournamentId], references: [id])
+  teamPlayers  TeamPlayer[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@map("teams")
+}
+
+model Player {
+  id          Int          @id @default(autoincrement())
+  name        String
+  teamPlayers TeamPlayer[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@map("players")
+}
+
+model TeamPlayer {
+  id                 Int                 @id @default(autoincrement())
+  teamId             Int
+  playerId           Int
+  isReplacement      Boolean             @default(false)
+  team               Team                @relation(fields: [teamId], references: [id])
+  player             Player              @relation(fields: [playerId], references: [id])
+  teamPlayerSessions TeamPlayerSession[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@unique([teamId, playerId])
+  @@map("team_players")
+}
+
+model Session {
+  id                 Int                 @id @default(autoincrement())
+  tournamentId       Int
+  laneId             Int
+  sessionDate        DateTime
+  tournament         Tournament          @relation(fields: [tournamentId], references: [id])
+  lane               Lane                @relation(fields: [laneId], references: [id])
+  teamPlayerSessions TeamPlayerSession[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@map("sessions")
+}
+
+model Lane {
+  id                 Int                 @id @default(autoincrement())
+  laneNumber         Int                 @unique
+  opponentLaneId     Int?                @unique
+  opponentLane       Lane?               @relation("LaneOpponents", fields: [opponentLaneId], references: [id])
+  opposingLane       Lane?               @relation("LaneOpponents")
+  sessions           Session[]
+  teamPlayerSessions TeamPlayerSession[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@map("lanes")
+}
+
+model TeamPlayerSession {
+  id           Int        @id @default(autoincrement())
+  teamPlayerId Int
+  sessionId    Int
+  laneId       Int
+  line1        Int        @default(0)
+  line2        Int        @default(0)
+  line3        Int        @default(0)
+  payment      Boolean    @default(false)
+  handicap     Int        @default(0)
+  assistance   Boolean    @default(false)
+  teamPlayer   TeamPlayer @relation(fields: [teamPlayerId], references: [id])
+  session      Session    @relation(fields: [sessionId], references: [id])
+  lane         Lane       @relation(fields: [laneId], references: [id])
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([teamPlayerId, sessionId])
+  @@map("team_player_sessions")
+}
