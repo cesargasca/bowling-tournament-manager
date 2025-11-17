@@ -8,11 +8,9 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
     const tournamentId = searchParams.get('tournamentId')
-    const laneId = searchParams.get('laneId')
 
     const where: any = {}
     if (tournamentId) where.tournamentId = parseInt(tournamentId)
-    if (laneId) where.laneId = parseInt(laneId)
 
     const sessions = await prisma.session.findMany({
       where,
@@ -24,10 +22,17 @@ export async function GET(request: NextRequest) {
             name: true,
           },
         },
-        lane: true,
+        sessionMatchups: {
+          include: {
+            lane: true,
+            teamA: true,
+            teamB: true,
+          },
+        },
         _count: {
           select: {
             teamPlayerSessions: true,
+            sessionMatchups: true,
           },
         },
       },
@@ -52,7 +57,13 @@ export async function POST(request: NextRequest) {
       },
       include: {
         tournament: true,
-        lane: true,
+        sessionMatchups: {
+          include: {
+            lane: true,
+            teamA: true,
+            teamB: true,
+          },
+        },
       },
     })
 

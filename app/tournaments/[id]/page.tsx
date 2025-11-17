@@ -90,7 +90,6 @@ export default function TournamentDetailPage() {
   const [teams, setTeams] = useState<any[]>([]);
   const [lanes, setLanes] = useState<any[]>([]);
   const [showCreateSessionForm, setShowCreateSessionForm] = useState(false);
-  const [selectedLaneId, setSelectedLaneId] = useState<string>('');
   const [sessionDate, setSessionDate] = useState('');
 
   useEffect(() => {
@@ -337,8 +336,8 @@ export default function TournamentDetailPage() {
   const handleCreateSession = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!selectedLaneId || !sessionDate) {
-      alert('Please select a lane and date');
+    if (!sessionDate) {
+      alert('Please select a date');
       return;
     }
 
@@ -348,7 +347,6 @@ export default function TournamentDetailPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tournamentId: parseInt(tournamentId),
-          laneId: parseInt(selectedLaneId),
           sessionDate: new Date(sessionDate).toISOString(),
         }),
       });
@@ -357,7 +355,6 @@ export default function TournamentDetailPage() {
 
       if (result.success) {
         setShowCreateSessionForm(false);
-        setSelectedLaneId('');
         setSessionDate('');
         fetchTournamentDetails();
         alert('Session created successfully');
@@ -1049,25 +1046,10 @@ export default function TournamentDetailPage() {
                 <h3 className="font-semibold text-zinc-900 dark:text-zinc-50 mb-4">
                   Create New Session
                 </h3>
+                <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
+                  Create a new session for a game day. After creating the session, you'll be able to assign teams to lanes and enter scores.
+                </p>
                 <form onSubmit={handleCreateSession} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-                      Lane
-                    </label>
-                    <select
-                      value={selectedLaneId}
-                      onChange={(e) => setSelectedLaneId(e.target.value)}
-                      className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50"
-                      required
-                    >
-                      <option value="">Select lane...</option>
-                      {lanes.filter((lane: any) => lane.opponentLane).map((lane: any) => (
-                        <option key={lane.id} value={lane.id}>
-                          Lane {lane.laneNumber} vs Lane {lane.opponentLane?.laneNumber}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
                   <div>
                     <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
                       Session Date
@@ -1116,9 +1098,9 @@ export default function TournamentDetailPage() {
                           })}
                         </h3>
                         <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
-                          Lane {session.lane.laneNumber}
-                          {session.lane.opponentLane &&
-                            ` vs Lane ${session.lane.opponentLane.laneNumber}`}
+                          {session._count?.sessionMatchups > 0
+                            ? `${session._count.sessionMatchups} match${session._count.sessionMatchups !== 1 ? 'es' : ''} configured`
+                            : 'No matches configured yet'}
                         </p>
                       </div>
                       <div className="text-right">
