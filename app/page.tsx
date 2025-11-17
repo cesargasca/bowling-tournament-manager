@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 interface DashboardData {
   overview: {
@@ -56,6 +57,7 @@ interface DashboardData {
 }
 
 export default function AdminDashboard() {
+  const router = useRouter();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -246,6 +248,9 @@ export default function AdminDashboard() {
         <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6 mb-8">
           <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50 mb-4">
             Active Tournaments
+            <span className="text-sm font-normal text-zinc-600 dark:text-zinc-400 ml-2">
+              (click to view details)
+            </span>
           </h2>
           {data.tournaments.length === 0 ? (
             <p className="text-zinc-600 dark:text-zinc-400">No tournaments found</p>
@@ -275,9 +280,10 @@ export default function AdminDashboard() {
                   {data.tournaments.map((tournament) => (
                     <tr
                       key={tournament.id}
-                      className="border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
+                      onClick={() => router.push(`/tournaments/${tournament.id}`)}
+                      className="border-b border-zinc-100 dark:border-zinc-800 hover:bg-blue-50 dark:hover:bg-blue-950/20 transition-colors cursor-pointer"
                     >
-                      <td className="py-3 px-4 text-zinc-900 dark:text-zinc-50 font-medium">
+                      <td className="py-3 px-4 text-blue-600 dark:text-blue-400 font-medium hover:text-blue-700 dark:hover:text-blue-300">
                         {tournament.name}
                       </td>
                       <td className="py-3 px-4 text-zinc-600 dark:text-zinc-400">
