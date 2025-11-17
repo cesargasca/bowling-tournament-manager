@@ -21,11 +21,12 @@ A full-stack bowling tournament management application built with Next.js 16, Pr
 
 - **Framework**: Next.js 16 (App Router)
 - **Database ORM**: Prisma
-- **Database**: SQLite (dev) / PostgreSQL (production)
+- **Database**: PostgreSQL 16 (via Docker)
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS v4
 - **Form Handling**: React Hook Form with Zod validation
 - **State Management**: Zustand
+- **Containerization**: Docker & Docker Compose
 
 ## Getting Started
 
@@ -33,42 +34,79 @@ A full-stack bowling tournament management application built with Next.js 16, Pr
 
 - Node.js 18+
 - npm or yarn
+- Docker & Docker Compose
 
-### Installation
+### Quick Start
 
-1. Clone the repository
+The fastest way to get started:
+
+```bash
+# 1. Clone and install
+git clone <repository-url>
+cd bowling-tournament-manager
+npm install
+
+# 2. Copy environment variables
+cp .env.example .env
+
+# 3. One command setup (starts Docker, creates DB, seeds data)
+npm run setup
+
+# 4. Start development server
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+### Manual Installation
+
+1. **Clone the repository**
 ```bash
 git clone <repository-url>
 cd bowling-tournament-manager
 ```
 
-2. Install dependencies
+2. **Install dependencies**
 ```bash
 npm install
 ```
 
-3. Set up environment variables
+3. **Set up environment variables**
 ```bash
-# .env file is already created with:
-DATABASE_URL="file:./dev.db"
+cp .env.example .env
+# Edit .env if needed (default values work with Docker setup)
 ```
 
-4. Push database schema
+4. **Start PostgreSQL database with Docker**
+```bash
+npm run docker:up
+```
+
+This will start a PostgreSQL 16 container with:
+- Host: localhost
+- Port: 5432
+- Database: bowling_tournament
+- User: bowling_user
+- Password: bowling_password
+
+5. **Push database schema**
 ```bash
 npm run db:push
 ```
 
-5. Seed the database with sample data
+6. **Seed the database with sample data**
 ```bash
 npm run db:seed
 ```
 
-6. Start the development server
+7. **Start the development server**
 ```bash
 npm run dev
 ```
 
-7. Open [http://localhost:3000](http://localhost:3000) in your browser
+8. **Open your browser**
+
+Navigate to [http://localhost:3000](http://localhost:3000)
 
 ## Database Schema
 
@@ -82,6 +120,52 @@ The application uses the following main entities:
 - **Session**: Bowling sessions for tournaments
 - **Lane**: Bowling lanes with opponent pairings
 - **TeamPlayerSession**: Individual player scores per session
+
+## Docker Setup
+
+The application uses Docker Compose to run PostgreSQL in a container. This ensures consistency across development environments.
+
+### Docker Configuration
+
+The `docker-compose.yml` file defines:
+- **PostgreSQL 16 Alpine** - Lightweight PostgreSQL image
+- **Persistent Volume** - Data persists between container restarts
+- **Health Check** - Ensures database is ready before connections
+- **Port Mapping** - Database accessible on localhost:5432
+
+### Managing the Database Container
+
+```bash
+# Start the database
+npm run docker:up
+
+# Check database logs
+npm run docker:logs
+
+# Stop the database
+npm run docker:down
+
+# Stop and remove volumes (⚠️ deletes all data)
+docker-compose down -v
+```
+
+### Database Credentials
+
+Default credentials (defined in `docker-compose.yml`):
+- **Host**: localhost
+- **Port**: 5432
+- **Database**: bowling_tournament
+- **User**: bowling_user
+- **Password**: bowling_password
+
+For production, update these credentials and use environment variables.
+
+### Accessing the Database
+
+You can access the database using:
+1. **Prisma Studio**: `npm run db:studio` (GUI interface)
+2. **psql CLI**: `docker exec -it bowling-tournament-db psql -U bowling_user -d bowling_tournament`
+3. **Any PostgreSQL client** using the credentials above
 
 ## API Routes
 
@@ -178,12 +262,27 @@ bowling-tournament-manager/
 
 ## Available Scripts
 
+### Development
 - `npm run dev` - Start development server
 - `npm run build` - Build for production
 - `npm start` - Start production server
 - `npm run lint` - Run ESLint
+
+### Docker Commands
+- `npm run docker:up` - Start PostgreSQL container
+- `npm run docker:down` - Stop PostgreSQL container
+- `npm run docker:logs` - View PostgreSQL logs
+
+### Database Commands
 - `npm run db:push` - Push Prisma schema to database
+- `npm run db:migrate` - Create and run migrations
 - `npm run db:seed` - Seed database with sample data
+- `npm run db:studio` - Open Prisma Studio (database GUI)
+- `npm run db:reset` - Reset database and re-run migrations
+- `npm run db:generate` - Generate Prisma Client
+
+### Quick Setup
+- `npm run setup` - Complete setup (Docker + DB + Seed)
 
 ## Sample Data
 
