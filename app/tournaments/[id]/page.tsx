@@ -79,6 +79,12 @@ export default function TournamentDetailPage() {
   const [newCategoryMin, setNewCategoryMin] = useState('');
   const [newCategoryMax, setNewCategoryMax] = useState('');
 
+  // Bulk selection states
+  const [selectedTeamIds, setSelectedTeamIds] = useState<Set<number>>(new Set());
+  const [selectedPlayerIds, setSelectedPlayerIds] = useState<Set<number>>(new Set());
+  const [bulkGroupId, setBulkGroupId] = useState<string>('');
+  const [bulkCategoryId, setBulkCategoryId] = useState<string>('');
+
   useEffect(() => {
     fetchTournamentDetails();
   }, [tournamentId]);
@@ -206,6 +212,103 @@ export default function TournamentDetailPage() {
     }
   };
 
+  // Bulk operations
+  const toggleTeamSelection = (teamId: number) => {
+    const newSelection = new Set(selectedTeamIds);
+    if (newSelection.has(teamId)) {
+      newSelection.delete(teamId);
+    } else {
+      newSelection.add(teamId);
+    }
+    setSelectedTeamIds(newSelection);
+  };
+
+  const toggleAllTeamsInGroup = (teams: any[]) => {
+    const teamIds = teams.map(t => t.teamId);
+    const allSelected = teamIds.every(id => selectedTeamIds.has(id));
+    const newSelection = new Set(selectedTeamIds);
+
+    if (allSelected) {
+      teamIds.forEach(id => newSelection.delete(id));
+    } else {
+      teamIds.forEach(id => newSelection.add(id));
+    }
+    setSelectedTeamIds(newSelection);
+  };
+
+  const bulkMoveTeams = async () => {
+    if (selectedTeamIds.size === 0 || !bulkGroupId) return;
+
+    try {
+      const response = await fetch('/api/teams/bulk-update-group', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          teamIds: Array.from(selectedTeamIds),
+          groupId: bulkGroupId,
+          tournamentId: tournamentId,
+        }),
+      });
+
+      if (response.ok) {
+        setSelectedTeamIds(new Set());
+        setBulkGroupId('');
+        fetchTournamentDetails();
+      }
+    } catch (err) {
+      console.error('Failed to bulk move teams:', err);
+    }
+  };
+
+  const togglePlayerSelection = (playerId: number) => {
+    const newSelection = new Set(selectedPlayerIds);
+    if (newSelection.has(playerId)) {
+      newSelection.delete(playerId);
+    } else {
+      newSelection.add(playerId);
+    }
+    setSelectedPlayerIds(newSelection);
+  };
+
+  const toggleAllPlayersInCategory = (players: any[]) => {
+    const playerIds = players.map(p => p.playerId);
+    const allSelected = playerIds.every(id => selectedPlayerIds.has(id));
+    const newSelection = new Set(selectedPlayerIds);
+
+    if (allSelected) {
+      playerIds.forEach(id => newSelection.delete(id));
+    } else {
+      playerIds.forEach(id => newSelection.add(id));
+    }
+    setSelectedPlayerIds(newSelection);
+  };
+
+  const bulkMovePlayers = async () => {
+    if (selectedPlayerIds.size === 0 || !bulkCategoryId) return;
+
+    try {
+      const response = await fetch(
+        `/api/tournaments/${tournamentId}/players/bulk-update-category`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            playerIds: Array.from(selectedPlayerIds),
+            categoryId: bulkCategoryId,
+          }),
+        }
+      );
+
+      if (response.ok) {
+        setSelectedPlayerIds(new Set());
+        setBulkCategoryId('');
+        fetchTournamentDetails();
+      }
+    } catch (err) {
+      console.error('Failed to bulk move players:', err);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center">
@@ -330,6 +433,45 @@ export default function TournamentDetailPage() {
         {/* Team Standings */}
         {activeTab === 'teams' && (
           <div className="space-y-6">
+            {/* Bulk Actions Toolbar */}
+            {managementMode && selectedTeamIds.size > 0 && (
+              <div className="bg-blue-100 dark:bg-blue-900/30 border-2 border-blue-600 dark:border-blue-500 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <span className="font-semibold text-zinc-900 dark:text-zinc-50">
+                      {selectedTeamIds.size} team{selectedTeamIds.size !== 1 ? 's' : ''} selected
+                    </span>
+                    <select
+                      value={bulkGroupId}
+                      onChange={(e) => setBulkGroupId(e.target.value)}
+                      className="px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50"
+                    >
+                      <option value="">Select group...</option>
+                      <option value="">Ungrouped</option>
+                      {data?.groups.map((g) => (
+                        <option key={g.id} value={g.id}>
+                          {g.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={bulkMoveTeams}
+                      disabled={!bulkGroupId && bulkGroupId !== ''}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Move to Group
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => setSelectedTeamIds(new Set())}
+                    className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50"
+                  >
+                    Clear Selection
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Create New Group */}
             {managementMode && (
               <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg p-4">
@@ -361,12 +503,24 @@ export default function TournamentDetailPage() {
                 className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden"
               >
                 <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50">
-                  <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
-                    {group.groupName}
-                  </h2>
-                  <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
-                    {group.teams.length} team{group.teams.length !== 1 ? 's' : ''}
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
+                        {group.groupName}
+                      </h2>
+                      <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
+                        {group.teams.length} team{group.teams.length !== 1 ? 's' : ''}
+                      </p>
+                    </div>
+                    {managementMode && group.teams.length > 0 && (
+                      <button
+                        onClick={() => toggleAllTeamsInGroup(group.teams)}
+                        className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+                      >
+                        {group.teams.every(t => selectedTeamIds.has(t.teamId)) ? 'Deselect All' : 'Select All'}
+                      </button>
+                    )}
+                  </div>
                 </div>
                 {group.teams.length === 0 ? (
                   <div className="px-6 py-8 text-center text-zinc-600 dark:text-zinc-400">
@@ -377,6 +531,11 @@ export default function TournamentDetailPage() {
                     <table className="w-full">
                       <thead className="bg-zinc-50 dark:bg-zinc-800/50">
                         <tr>
+                          {managementMode && (
+                            <th className="text-left py-3 px-6 text-zinc-700 dark:text-zinc-300 font-semibold w-12">
+
+                            </th>
+                          )}
                           <th className="text-left py-3 px-6 text-zinc-700 dark:text-zinc-300 font-semibold">
                             Rank
                           </th>
@@ -411,6 +570,16 @@ export default function TournamentDetailPage() {
                             key={team.teamId}
                             className="border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
                           >
+                            {managementMode && (
+                              <td className="py-4 px-6">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedTeamIds.has(team.teamId)}
+                                  onChange={() => toggleTeamSelection(team.teamId)}
+                                  className="w-4 h-4 text-blue-600 border-zinc-300 rounded focus:ring-blue-500"
+                                />
+                              </td>
+                            )}
                             <td className="py-4 px-6">
                               <div
                                 className={`flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm ${
@@ -481,6 +650,44 @@ export default function TournamentDetailPage() {
         {/* Player Standings */}
         {activeTab === 'players' && (
           <div className="space-y-6">
+            {/* Bulk Actions Toolbar */}
+            {managementMode && selectedPlayerIds.size > 0 && (
+              <div className="bg-green-100 dark:bg-green-900/30 border-2 border-green-600 dark:border-green-500 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <span className="font-semibold text-zinc-900 dark:text-zinc-50">
+                      {selectedPlayerIds.size} player{selectedPlayerIds.size !== 1 ? 's' : ''} selected
+                    </span>
+                    <select
+                      value={bulkCategoryId}
+                      onChange={(e) => setBulkCategoryId(e.target.value)}
+                      className="px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50"
+                    >
+                      <option value="">Select category...</option>
+                      {data?.categories.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={bulkMovePlayers}
+                      disabled={!bulkCategoryId}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Move to Category
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => setSelectedPlayerIds(new Set())}
+                    className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50"
+                  >
+                    Clear Selection
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Create New Category */}
             {managementMode && (
               <div className="space-y-3">
@@ -564,20 +771,32 @@ export default function TournamentDetailPage() {
                 className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden"
               >
                 <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50">
-                  <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
-                    {category.categoryName}
-                  </h2>
-                  <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
-                    {category.minAverage || category.maxAverage ? (
-                      <>
-                        Average range:{' '}
-                        {category.minAverage && `${category.minAverage}+`}
-                        {category.minAverage && category.maxAverage && ' to '}
-                        {category.maxAverage && `${category.maxAverage}`} •{' '}
-                      </>
-                    ) : null}
-                    {category.players.length} player{category.players.length !== 1 ? 's' : ''}
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
+                        {category.categoryName}
+                      </h2>
+                      <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
+                        {category.minAverage || category.maxAverage ? (
+                          <>
+                            Average range:{' '}
+                            {category.minAverage && `${category.minAverage}+`}
+                            {category.minAverage && category.maxAverage && ' to '}
+                            {category.maxAverage && `${category.maxAverage}`} •{' '}
+                          </>
+                        ) : null}
+                        {category.players.length} player{category.players.length !== 1 ? 's' : ''}
+                      </p>
+                    </div>
+                    {managementMode && category.players.length > 0 && (
+                      <button
+                        onClick={() => toggleAllPlayersInCategory(category.players)}
+                        className="text-sm text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300"
+                      >
+                        {category.players.every(p => selectedPlayerIds.has(p.playerId)) ? 'Deselect All' : 'Select All'}
+                      </button>
+                    )}
+                  </div>
                 </div>
                 {category.players.length === 0 ? (
                   <div className="px-6 py-8 text-center text-zinc-600 dark:text-zinc-400">
@@ -588,6 +807,11 @@ export default function TournamentDetailPage() {
                     <table className="w-full">
                       <thead className="bg-zinc-50 dark:bg-zinc-800/50">
                         <tr>
+                          {managementMode && (
+                            <th className="text-left py-3 px-6 text-zinc-700 dark:text-zinc-300 font-semibold w-12">
+
+                            </th>
+                          )}
                           <th className="text-left py-3 px-6 text-zinc-700 dark:text-zinc-300 font-semibold">
                             Rank
                           </th>
@@ -628,6 +852,16 @@ export default function TournamentDetailPage() {
                             key={player.playerId}
                             className="border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
                           >
+                            {managementMode && (
+                              <td className="py-4 px-6">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedPlayerIds.has(player.playerId)}
+                                  onChange={() => togglePlayerSelection(player.playerId)}
+                                  className="w-4 h-4 text-green-600 border-zinc-300 rounded focus:ring-green-500"
+                                />
+                              </td>
+                            )}
                             <td className="py-4 px-6">
                               <div
                                 className={`flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm ${
