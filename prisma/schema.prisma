@@ -21,37 +21,43 @@ model Bowling {
 }
 
 model Tournament {
-  id        Int       @id @default(autoincrement())
-  name      String
-  bowlingId Int
-  bowling   Bowling   @relation(fields: [bowlingId], references: [id])
-  sessions  Session[]
-  teams     Team[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id                       Int                       @id @default(autoincrement())
+  name                     String
+  bowlingId                Int
+  bowling                  Bowling                   @relation(fields: [bowlingId], references: [id])
+  sessions                 Session[]
+  teams                    Team[]
+  groups                   TournamentGroup[]
+  playerCategories         PlayerCategory[]
+  playerTournamentCategory PlayerTournamentCategory[]
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
 
   @@map("tournaments")
 }
 
 model Team {
-  id           Int          @id @default(autoincrement())
+  id           Int              @id @default(autoincrement())
   tournamentId Int
   name         String
-  laneId       Int?         // Lane assigned to this team for the tournament
-  tournament   Tournament   @relation(fields: [tournamentId], references: [id])
+  laneId       Int?             // Lane assigned to this team for the tournament
+  groupId      Int?             // Group this team belongs to
+  tournament   Tournament       @relation(fields: [tournamentId], references: [id])
+  group        TournamentGroup? @relation(fields: [groupId], references: [id])
   teamPlayers  TeamPlayer[]
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
 
   @@map("teams")
 }
 
 model Player {
-  id          Int          @id @default(autoincrement())
-  name        String
-  teamPlayers TeamPlayer[]
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id                       Int                        @id @default(autoincrement())
+  name                     String
+  teamPlayers              TeamPlayer[]
+  playerTournamentCategory PlayerTournamentCategory[]
+  createdAt                DateTime                   @default(now())
+  updatedAt                DateTime                   @updatedAt
 
   @@map("players")
 }
@@ -118,4 +124,48 @@ model TeamPlayerSession {
 
   @@unique([teamPlayerId, sessionId])
   @@map("team_player_sessions")
+}
+
+model TournamentGroup {
+  id           Int        @id @default(autoincrement())
+  tournamentId Int
+  name         String
+  displayOrder Int        @default(0)
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  teams        Team[]
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@map("tournament_groups")
+}
+
+model PlayerCategory {
+  id                       Int                        @id @default(autoincrement())
+  tournamentId             Int
+  name                     String
+  minAverage               Int?                       // Minimum average for auto-assignment
+  maxAverage               Int?                       // Maximum average for auto-assignment
+  displayOrder             Int                        @default(0)
+  tournament               Tournament                 @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  playerTournamentCategory PlayerTournamentCategory[]
+  createdAt                DateTime                   @default(now())
+  updatedAt                DateTime                   @updatedAt
+
+  @@map("player_categories")
+}
+
+model PlayerTournamentCategory {
+  id           Int            @id @default(autoincrement())
+  playerId     Int
+  tournamentId Int
+  categoryId   Int
+  isManual     Boolean        @default(false) // Whether manually assigned or auto-assigned
+  player       Player         @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  tournament   Tournament     @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  category     PlayerCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@unique([playerId, tournamentId])
+  @@map("player_tournament_categories")
 }
