@@ -12,28 +12,53 @@ interface TournamentDetails {
     sessionsCount: number;
     playersCount: number;
   };
-  teamStandings: Array<{
-    teamId: number;
-    teamName: string;
-    totalPoints: number;
-    sessionsPlayed: number;
-    wins: number;
-    losses: number;
-    ties: number;
-    totalPins: number;
-    averagePins: number;
+  groups: Array<{
+    id: number;
+    name: string;
+    displayOrder: number;
   }>;
-  playerStandings: Array<{
-    playerId: number;
-    playerName: string;
-    teamName: string;
-    gamesPlayed: number;
-    totalPins: number;
-    average: number;
-    highGame: number;
-    lowGame: number;
-    attendanceRate: number;
-    paymentRate: number;
+  categories: Array<{
+    id: number;
+    name: string;
+    minAverage: number | null;
+    maxAverage: number | null;
+    displayOrder: number;
+  }>;
+  groupedStandings: Array<{
+    groupId: number | null;
+    groupName: string;
+    teams: Array<{
+      teamId: number;
+      teamName: string;
+      groupId: number | null;
+      totalPoints: number;
+      sessionsPlayed: number;
+      wins: number;
+      losses: number;
+      ties: number;
+      totalPins: number;
+      averagePins: number;
+    }>;
+  }>;
+  categorizedStandings: Array<{
+    categoryId: number | null;
+    categoryName: string;
+    minAverage: number | null;
+    maxAverage: number | null;
+    players: Array<{
+      playerId: number;
+      playerName: string;
+      teamName: string;
+      categoryId: number | null;
+      isManualCategory: boolean;
+      gamesPlayed: number;
+      totalPins: number;
+      average: number;
+      highGame: number;
+      lowGame: number;
+      attendanceRate: number;
+      paymentRate: number;
+    }>;
   }>;
 }
 
@@ -46,6 +71,13 @@ export default function TournamentDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'teams' | 'players'>('teams');
+  const [managementMode, setManagementMode] = useState(false);
+
+  // Form states for new group/category
+  const [newGroupName, setNewGroupName] = useState('');
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryMin, setNewCategoryMin] = useState('');
+  const [newCategoryMax, setNewCategoryMax] = useState('');
 
   useEffect(() => {
     fetchTournamentDetails();
@@ -67,6 +99,85 @@ export default function TournamentDetailPage() {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const createGroup = async () => {
+    if (!newGroupName.trim()) return;
+
+    try {
+      const response = await fetch(`/api/tournaments/${tournamentId}/groups`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newGroupName }),
+      });
+
+      if (response.ok) {
+        setNewGroupName('');
+        fetchTournamentDetails();
+      }
+    } catch (err) {
+      console.error('Failed to create group:', err);
+    }
+  };
+
+  const createCategory = async () => {
+    if (!newCategoryName.trim()) return;
+
+    try {
+      const response = await fetch(`/api/tournaments/${tournamentId}/categories`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newCategoryName,
+          minAverage: newCategoryMin || null,
+          maxAverage: newCategoryMax || null,
+        }),
+      });
+
+      if (response.ok) {
+        setNewCategoryName('');
+        setNewCategoryMin('');
+        setNewCategoryMax('');
+        fetchTournamentDetails();
+      }
+    } catch (err) {
+      console.error('Failed to create category:', err);
+    }
+  };
+
+  const moveTeamToGroup = async (teamId: number, groupId: number | null) => {
+    try {
+      const response = await fetch(`/api/teams/${teamId}/group`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ groupId }),
+      });
+
+      if (response.ok) {
+        fetchTournamentDetails();
+      }
+    } catch (err) {
+      console.error('Failed to move team:', err);
+    }
+  };
+
+  const movePlayerToCategory = async (playerId: number, categoryId: number) => {
+    try {
+      const response = await fetch(
+        `/api/tournaments/${tournamentId}/players/${playerId}/category`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ categoryId, isManual: true }),
+        }
+      );
+
+      if (response.ok) {
+        fetchTournamentDetails();
+      }
+    } catch (err) {
+      console.error('Failed to move player:', err);
     }
   };
 
@@ -112,39 +223,54 @@ export default function TournamentDetailPage() {
       {/* Header */}
       <div className="bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <button
-            onClick={() => router.push('/')}
-            className="mb-4 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 flex items-center gap-2"
-          >
-            <span>←</span> Back to Dashboard
-          </button>
-          <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-50">
-            {data.tournament.name}
-          </h1>
-          <p className="mt-2 text-zinc-600 dark:text-zinc-400">
-            {data.tournament.bowlingAlley}
-          </p>
+          <div className="flex justify-between items-start">
+            <div>
+              <button
+                onClick={() => router.push('/')}
+                className="mb-4 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 flex items-center gap-2"
+              >
+                <span>←</span> Back to Dashboard
+              </button>
+              <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-50">
+                {data.tournament.name}
+              </h1>
+              <p className="mt-2 text-zinc-600 dark:text-zinc-400">
+                {data.tournament.bowlingAlley}
+              </p>
 
-          {/* Stats */}
-          <div className="mt-4 flex gap-6 text-sm">
-            <div>
-              <span className="text-zinc-600 dark:text-zinc-400">Teams:</span>{' '}
-              <span className="font-semibold text-zinc-900 dark:text-zinc-50">
-                {data.tournament.teamsCount}
-              </span>
+              {/* Stats */}
+              <div className="mt-4 flex gap-6 text-sm">
+                <div>
+                  <span className="text-zinc-600 dark:text-zinc-400">Teams:</span>{' '}
+                  <span className="font-semibold text-zinc-900 dark:text-zinc-50">
+                    {data.tournament.teamsCount}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-zinc-600 dark:text-zinc-400">Players:</span>{' '}
+                  <span className="font-semibold text-zinc-900 dark:text-zinc-50">
+                    {data.tournament.playersCount}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-zinc-600 dark:text-zinc-400">Sessions:</span>{' '}
+                  <span className="font-semibold text-zinc-900 dark:text-zinc-50">
+                    {data.tournament.sessionsCount}
+                  </span>
+                </div>
+              </div>
             </div>
-            <div>
-              <span className="text-zinc-600 dark:text-zinc-400">Players:</span>{' '}
-              <span className="font-semibold text-zinc-900 dark:text-zinc-50">
-                {data.tournament.playersCount}
-              </span>
-            </div>
-            <div>
-              <span className="text-zinc-600 dark:text-zinc-400">Sessions:</span>{' '}
-              <span className="font-semibold text-zinc-900 dark:text-zinc-50">
-                {data.tournament.sessionsCount}
-              </span>
-            </div>
+
+            <button
+              onClick={() => setManagementMode(!managementMode)}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                managementMode
+                  ? 'bg-green-600 text-white hover:bg-green-700'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+              }`}
+            >
+              {managementMode ? 'Done Managing' : 'Manage Groups & Categories'}
+            </button>
           </div>
         </div>
       </div>
@@ -178,223 +304,374 @@ export default function TournamentDetailPage() {
 
         {/* Team Standings */}
         {activeTab === 'teams' && (
-          <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
-            <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800">
-              <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
-                Team Standings (by Points)
-              </h2>
-              <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
-                Teams ranked by total points, then by total pins
-              </p>
-            </div>
-            {data.teamStandings.length === 0 ? (
-              <div className="px-6 py-8 text-center text-zinc-600 dark:text-zinc-400">
-                No team standings available yet
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-zinc-50 dark:bg-zinc-800/50">
-                    <tr>
-                      <th className="text-left py-3 px-6 text-zinc-700 dark:text-zinc-300 font-semibold">
-                        Rank
-                      </th>
-                      <th className="text-left py-3 px-6 text-zinc-700 dark:text-zinc-300 font-semibold">
-                        Team
-                      </th>
-                      <th className="text-center py-3 px-6 text-zinc-700 dark:text-zinc-300 font-semibold">
-                        Points
-                      </th>
-                      <th className="text-center py-3 px-6 text-zinc-700 dark:text-zinc-300 font-semibold">
-                        Sessions
-                      </th>
-                      <th className="text-center py-3 px-6 text-zinc-700 dark:text-zinc-300 font-semibold">
-                        W-L-T
-                      </th>
-                      <th className="text-center py-3 px-6 text-zinc-700 dark:text-zinc-300 font-semibold">
-                        Total Pins
-                      </th>
-                      <th className="text-center py-3 px-6 text-zinc-700 dark:text-zinc-300 font-semibold">
-                        Avg Pins
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.teamStandings.map((team, index) => (
-                      <tr
-                        key={team.teamId}
-                        className="border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
-                      >
-                        <td className="py-4 px-6">
-                          <div className="flex items-center gap-3">
-                            <div
-                              className={`flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm ${
-                                index === 0
-                                  ? 'bg-yellow-500 text-white'
-                                  : index === 1
-                                  ? 'bg-zinc-400 text-white'
-                                  : index === 2
-                                  ? 'bg-orange-600 text-white'
-                                  : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300'
-                              }`}
-                            >
-                              {index + 1}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-4 px-6 text-zinc-900 dark:text-zinc-50 font-medium">
-                          {team.teamName}
-                        </td>
-                        <td className="py-4 px-6 text-center">
-                          <span className="text-lg font-bold text-blue-600 dark:text-blue-400">
-                            {team.totalPoints}
-                          </span>
-                        </td>
-                        <td className="py-4 px-6 text-center text-zinc-900 dark:text-zinc-50">
-                          {team.sessionsPlayed}
-                        </td>
-                        <td className="py-4 px-6 text-center text-zinc-600 dark:text-zinc-400">
-                          {team.wins}-{team.losses}-{team.ties}
-                        </td>
-                        <td className="py-4 px-6 text-center text-zinc-900 dark:text-zinc-50">
-                          {team.totalPins.toLocaleString()}
-                        </td>
-                        <td className="py-4 px-6 text-center text-zinc-900 dark:text-zinc-50">
-                          {team.averagePins}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+          <div className="space-y-6">
+            {/* Create New Group */}
+            {managementMode && (
+              <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg p-4">
+                <h3 className="font-semibold text-zinc-900 dark:text-zinc-50 mb-3">
+                  Create New Group
+                </h3>
+                <div className="flex gap-3">
+                  <input
+                    type="text"
+                    value={newGroupName}
+                    onChange={(e) => setNewGroupName(e.target.value)}
+                    placeholder="Group name (e.g., Division A)"
+                    className="flex-1 px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50"
+                  />
+                  <button
+                    onClick={createGroup}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Create Group
+                  </button>
+                </div>
               </div>
             )}
+
+            {/* Grouped Standings */}
+            {data.groupedStandings.map((group) => (
+              <div
+                key={group.groupId || 'ungrouped'}
+                className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden"
+              >
+                <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50">
+                  <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
+                    {group.groupName}
+                  </h2>
+                  <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
+                    {group.teams.length} team{group.teams.length !== 1 ? 's' : ''}
+                  </p>
+                </div>
+                {group.teams.length === 0 ? (
+                  <div className="px-6 py-8 text-center text-zinc-600 dark:text-zinc-400">
+                    No teams in this group yet
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-zinc-50 dark:bg-zinc-800/50">
+                        <tr>
+                          <th className="text-left py-3 px-6 text-zinc-700 dark:text-zinc-300 font-semibold">
+                            Rank
+                          </th>
+                          <th className="text-left py-3 px-6 text-zinc-700 dark:text-zinc-300 font-semibold">
+                            Team
+                          </th>
+                          {managementMode && (
+                            <th className="text-left py-3 px-6 text-zinc-700 dark:text-zinc-300 font-semibold">
+                              Move To
+                            </th>
+                          )}
+                          <th className="text-center py-3 px-6 text-zinc-700 dark:text-zinc-300 font-semibold">
+                            Points
+                          </th>
+                          <th className="text-center py-3 px-6 text-zinc-700 dark:text-zinc-300 font-semibold">
+                            Sessions
+                          </th>
+                          <th className="text-center py-3 px-6 text-zinc-700 dark:text-zinc-300 font-semibold">
+                            W-L-T
+                          </th>
+                          <th className="text-center py-3 px-6 text-zinc-700 dark:text-zinc-300 font-semibold">
+                            Total Pins
+                          </th>
+                          <th className="text-center py-3 px-6 text-zinc-700 dark:text-zinc-300 font-semibold">
+                            Avg Pins
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {group.teams.map((team, index) => (
+                          <tr
+                            key={team.teamId}
+                            className="border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
+                          >
+                            <td className="py-4 px-6">
+                              <div
+                                className={`flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm ${
+                                  index === 0
+                                    ? 'bg-yellow-500 text-white'
+                                    : index === 1
+                                    ? 'bg-zinc-400 text-white'
+                                    : index === 2
+                                    ? 'bg-orange-600 text-white'
+                                    : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300'
+                                }`}
+                              >
+                                {index + 1}
+                              </div>
+                            </td>
+                            <td className="py-4 px-6 text-zinc-900 dark:text-zinc-50 font-medium">
+                              {team.teamName}
+                            </td>
+                            {managementMode && (
+                              <td className="py-4 px-6">
+                                <select
+                                  value={team.groupId || ''}
+                                  onChange={(e) =>
+                                    moveTeamToGroup(
+                                      team.teamId,
+                                      e.target.value ? parseInt(e.target.value) : null
+                                    )
+                                  }
+                                  className="px-2 py-1 text-sm border border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50"
+                                >
+                                  <option value="">Ungrouped</option>
+                                  {data.groups.map((g) => (
+                                    <option key={g.id} value={g.id}>
+                                      {g.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </td>
+                            )}
+                            <td className="py-4 px-6 text-center">
+                              <span className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                                {team.totalPoints}
+                              </span>
+                            </td>
+                            <td className="py-4 px-6 text-center text-zinc-900 dark:text-zinc-50">
+                              {team.sessionsPlayed}
+                            </td>
+                            <td className="py-4 px-6 text-center text-zinc-600 dark:text-zinc-400">
+                              {team.wins}-{team.losses}-{team.ties}
+                            </td>
+                            <td className="py-4 px-6 text-center text-zinc-900 dark:text-zinc-50">
+                              {team.totalPins.toLocaleString()}
+                            </td>
+                            <td className="py-4 px-6 text-center text-zinc-900 dark:text-zinc-50">
+                              {team.averagePins}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         )}
 
         {/* Player Standings */}
         {activeTab === 'players' && (
-          <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
-            <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800">
-              <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
-                Player Standings (by Average)
-              </h2>
-              <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
-                Players ranked by game average (total pins / total lines, without handicap)
-              </p>
-            </div>
-            {data.playerStandings.length === 0 ? (
-              <div className="px-6 py-8 text-center text-zinc-600 dark:text-zinc-400">
-                No player standings available yet
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-zinc-50 dark:bg-zinc-800/50">
-                    <tr>
-                      <th className="text-left py-3 px-6 text-zinc-700 dark:text-zinc-300 font-semibold">
-                        Rank
-                      </th>
-                      <th className="text-left py-3 px-6 text-zinc-700 dark:text-zinc-300 font-semibold">
-                        Player
-                      </th>
-                      <th className="text-left py-3 px-6 text-zinc-700 dark:text-zinc-300 font-semibold">
-                        Team
-                      </th>
-                      <th className="text-center py-3 px-6 text-zinc-700 dark:text-zinc-300 font-semibold">
-                        Average
-                      </th>
-                      <th className="text-center py-3 px-6 text-zinc-700 dark:text-zinc-300 font-semibold">
-                        Games
-                      </th>
-                      <th className="text-center py-3 px-6 text-zinc-700 dark:text-zinc-300 font-semibold">
-                        Total Pins
-                      </th>
-                      <th className="text-center py-3 px-6 text-zinc-700 dark:text-zinc-300 font-semibold">
-                        High/Low
-                      </th>
-                      <th className="text-center py-3 px-6 text-zinc-700 dark:text-zinc-300 font-semibold">
-                        Attendance
-                      </th>
-                      <th className="text-center py-3 px-6 text-zinc-700 dark:text-zinc-300 font-semibold">
-                        Payment
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.playerStandings.map((player, index) => (
-                      <tr
-                        key={player.playerId}
-                        className="border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
-                      >
-                        <td className="py-4 px-6">
-                          <div className="flex items-center gap-3">
-                            <div
-                              className={`flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm ${
-                                index === 0
-                                  ? 'bg-yellow-500 text-white'
-                                  : index === 1
-                                  ? 'bg-zinc-400 text-white'
-                                  : index === 2
-                                  ? 'bg-orange-600 text-white'
-                                  : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300'
-                              }`}
-                            >
-                              {index + 1}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-4 px-6 text-zinc-900 dark:text-zinc-50 font-medium">
-                          {player.playerName}
-                        </td>
-                        <td className="py-4 px-6 text-zinc-600 dark:text-zinc-400">
-                          {player.teamName}
-                        </td>
-                        <td className="py-4 px-6 text-center">
-                          <span className="text-lg font-bold text-blue-600 dark:text-blue-400">
-                            {player.average}
-                          </span>
-                        </td>
-                        <td className="py-4 px-6 text-center text-zinc-900 dark:text-zinc-50">
-                          {player.gamesPlayed}
-                        </td>
-                        <td className="py-4 px-6 text-center text-zinc-900 dark:text-zinc-50">
-                          {player.totalPins.toLocaleString()}
-                        </td>
-                        <td className="py-4 px-6 text-center text-zinc-600 dark:text-zinc-400">
-                          {player.highGame}/{player.lowGame}
-                        </td>
-                        <td className="py-4 px-6 text-center">
-                          <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                              player.attendanceRate >= 80
-                                ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                                : player.attendanceRate >= 60
-                                ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
-                                : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
-                            }`}
-                          >
-                            {player.attendanceRate}%
-                          </span>
-                        </td>
-                        <td className="py-4 px-6 text-center">
-                          <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                              player.paymentRate >= 80
-                                ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                                : player.paymentRate >= 60
-                                ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
-                                : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
-                            }`}
-                          >
-                            {player.paymentRate}%
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+          <div className="space-y-6">
+            {/* Create New Category */}
+            {managementMode && (
+              <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg p-4">
+                <h3 className="font-semibold text-zinc-900 dark:text-zinc-50 mb-3">
+                  Create New Category
+                </h3>
+                <div className="flex gap-3 items-end">
+                  <div className="flex-1">
+                    <label className="block text-sm text-zinc-600 dark:text-zinc-400 mb-1">
+                      Category Name
+                    </label>
+                    <input
+                      type="text"
+                      value={newCategoryName}
+                      onChange={(e) => setNewCategoryName(e.target.value)}
+                      placeholder="e.g., Pro, Advanced, Intermediate"
+                      className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-zinc-600 dark:text-zinc-400 mb-1">
+                      Min Avg (optional)
+                    </label>
+                    <input
+                      type="number"
+                      value={newCategoryMin}
+                      onChange={(e) => setNewCategoryMin(e.target.value)}
+                      placeholder="150"
+                      className="w-24 px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-zinc-600 dark:text-zinc-400 mb-1">
+                      Max Avg (optional)
+                    </label>
+                    <input
+                      type="number"
+                      value={newCategoryMax}
+                      onChange={(e) => setNewCategoryMax(e.target.value)}
+                      placeholder="200"
+                      className="w-24 px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50"
+                    />
+                  </div>
+                  <button
+                    onClick={createCategory}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Create Category
+                  </button>
+                </div>
               </div>
             )}
+
+            {/* Categorized Standings */}
+            {data.categorizedStandings.map((category) => (
+              <div
+                key={category.categoryId || 'uncategorized'}
+                className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden"
+              >
+                <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50">
+                  <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
+                    {category.categoryName}
+                  </h2>
+                  <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
+                    {category.minAverage || category.maxAverage ? (
+                      <>
+                        Average range:{' '}
+                        {category.minAverage && `${category.minAverage}+`}
+                        {category.minAverage && category.maxAverage && ' to '}
+                        {category.maxAverage && `${category.maxAverage}`} •{' '}
+                      </>
+                    ) : null}
+                    {category.players.length} player{category.players.length !== 1 ? 's' : ''}
+                  </p>
+                </div>
+                {category.players.length === 0 ? (
+                  <div className="px-6 py-8 text-center text-zinc-600 dark:text-zinc-400">
+                    No players in this category yet
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-zinc-50 dark:bg-zinc-800/50">
+                        <tr>
+                          <th className="text-left py-3 px-6 text-zinc-700 dark:text-zinc-300 font-semibold">
+                            Rank
+                          </th>
+                          <th className="text-left py-3 px-6 text-zinc-700 dark:text-zinc-300 font-semibold">
+                            Player
+                          </th>
+                          <th className="text-left py-3 px-6 text-zinc-700 dark:text-zinc-300 font-semibold">
+                            Team
+                          </th>
+                          {managementMode && (
+                            <th className="text-left py-3 px-6 text-zinc-700 dark:text-zinc-300 font-semibold">
+                              Move To
+                            </th>
+                          )}
+                          <th className="text-center py-3 px-6 text-zinc-700 dark:text-zinc-300 font-semibold">
+                            Average
+                          </th>
+                          <th className="text-center py-3 px-6 text-zinc-700 dark:text-zinc-300 font-semibold">
+                            Games
+                          </th>
+                          <th className="text-center py-3 px-6 text-zinc-700 dark:text-zinc-300 font-semibold">
+                            Total Pins
+                          </th>
+                          <th className="text-center py-3 px-6 text-zinc-700 dark:text-zinc-300 font-semibold">
+                            High/Low
+                          </th>
+                          <th className="text-center py-3 px-6 text-zinc-700 dark:text-zinc-300 font-semibold">
+                            Attendance
+                          </th>
+                          <th className="text-center py-3 px-6 text-zinc-700 dark:text-zinc-300 font-semibold">
+                            Payment
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {category.players.map((player, index) => (
+                          <tr
+                            key={player.playerId}
+                            className="border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
+                          >
+                            <td className="py-4 px-6">
+                              <div
+                                className={`flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm ${
+                                  index === 0
+                                    ? 'bg-yellow-500 text-white'
+                                    : index === 1
+                                    ? 'bg-zinc-400 text-white'
+                                    : index === 2
+                                    ? 'bg-orange-600 text-white'
+                                    : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300'
+                                }`}
+                              >
+                                {index + 1}
+                              </div>
+                            </td>
+                            <td className="py-4 px-6 text-zinc-900 dark:text-zinc-50 font-medium">
+                              {player.playerName}
+                              {player.isManualCategory && (
+                                <span className="ml-2 text-xs text-orange-600 dark:text-orange-400">
+                                  (manual)
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-4 px-6 text-zinc-600 dark:text-zinc-400">
+                              {player.teamName}
+                            </td>
+                            {managementMode && (
+                              <td className="py-4 px-6">
+                                <select
+                                  value={player.categoryId || ''}
+                                  onChange={(e) =>
+                                    movePlayerToCategory(player.playerId, parseInt(e.target.value))
+                                  }
+                                  className="px-2 py-1 text-sm border border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50"
+                                >
+                                  <option value="">Select category...</option>
+                                  {data.categories.map((c) => (
+                                    <option key={c.id} value={c.id}>
+                                      {c.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </td>
+                            )}
+                            <td className="py-4 px-6 text-center">
+                              <span className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                                {player.average}
+                              </span>
+                            </td>
+                            <td className="py-4 px-6 text-center text-zinc-900 dark:text-zinc-50">
+                              {player.gamesPlayed}
+                            </td>
+                            <td className="py-4 px-6 text-center text-zinc-900 dark:text-zinc-50">
+                              {player.totalPins.toLocaleString()}
+                            </td>
+                            <td className="py-4 px-6 text-center text-zinc-600 dark:text-zinc-400">
+                              {player.highGame}/{player.lowGame}
+                            </td>
+                            <td className="py-4 px-6 text-center">
+                              <span
+                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                  player.attendanceRate >= 80
+                                    ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                                    : player.attendanceRate >= 60
+                                    ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
+                                    : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                                }`}
+                              >
+                                {player.attendanceRate}%
+                              </span>
+                            </td>
+                            <td className="py-4 px-6 text-center">
+                              <span
+                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                  player.paymentRate >= 80
+                                    ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                                    : player.paymentRate >= 60
+                                    ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
+                                    : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                                }`}
+                              >
+                                {player.paymentRate}%
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         )}
       </div>

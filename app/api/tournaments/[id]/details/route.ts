@@ -6,6 +6,8 @@ import { calculateSessionPoints, calculateLineScores } from '@/lib/services/scor
 interface TeamStanding {
   teamId: number;
   teamName: string;
+  groupId: number | null;
+  groupName: string | null;
   totalPoints: number;
   sessionsPlayed: number;
   wins: number;
@@ -19,6 +21,9 @@ interface PlayerStanding {
   playerId: number;
   playerName: string;
   teamName: string;
+  categoryId: number | null;
+  categoryName: string | null;
+  isManualCategory: boolean;
   gamesPlayed: number;
   totalPins: number;
   average: number;
@@ -26,6 +31,20 @@ interface PlayerStanding {
   lowGame: number;
   attendanceRate: number;
   paymentRate: number;
+}
+
+interface GroupedStandings {
+  groupId: number | null;
+  groupName: string;
+  teams: TeamStanding[];
+}
+
+interface CategorizedStandings {
+  categoryId: number | null;
+  categoryName: string;
+  minAverage: number | null;
+  maxAverage: number | null;
+  players: PlayerStanding[];
 }
 
 // GET /api/tournaments/[id]/details - Get tournament details with team and player standings
@@ -42,8 +61,15 @@ export async function GET(
       where: { id: tournamentId },
       include: {
         bowling: true,
+        groups: {
+          orderBy: { displayOrder: 'asc' },
+        },
+        playerCategories: {
+          orderBy: { displayOrder: 'asc' },
+        },
         teams: {
           include: {
+            group: true,
             teamPlayers: {
               include: {
                 player: true,
@@ -76,12 +102,30 @@ export async function GET(
       return errorResponse('Tournament not found', 404);
     }
 
+    // Get player category assignments
+    const playerCategories = await prisma.playerTournamentCategory.findMany({
+      where: { tournamentId },
+      include: {
+        category: true,
+        player: true,
+      },
+    });
+
+    const playerCategoryMap = new Map(
+      playerCategories.map(pc => [
+        pc.playerId,
+        { categoryId: pc.categoryId, categoryName: pc.category.name, isManual: pc.isManual },
+      ])
+    );
+
     // Initialize team statistics
     const teamStats: Map<number, TeamStanding> = new Map();
     tournament.teams.forEach((team) => {
       teamStats.set(team.id, {
         teamId: team.id,
         teamName: team.name,
+        groupId: team.groupId,
+        groupName: team.group?.name || null,
         totalPoints: 0,
         sessionsPlayed: 0,
         wins: 0,
@@ -156,10 +200,14 @@ export async function GET(
         const teamName = tps.teamPlayer.team.name;
 
         if (!playerStats.has(playerId)) {
+          const categoryInfo = playerCategoryMap.get(playerId);
           playerStats.set(playerId, {
             playerId,
             playerName,
             teamName,
+            categoryId: categoryInfo?.categoryId || null,
+            categoryName: categoryInfo?.categoryName || null,
+            isManualCategory: categoryInfo?.isManual || false,
             gamesPlayed: 0,
             totalPins: 0,
             average: 0,
@@ -213,15 +261,37 @@ export async function GET(
       playerStandingsArray.push(stats);
     }
 
-    // Sort team standings by total points, then by total pins
-    const teamStandings = Array.from(teamStats.values())
-      .map((stats) => ({
-        ...stats,
-        averagePins:
-          stats.sessionsPlayed > 0
-            ? Math.round(stats.totalPins / stats.sessionsPlayed)
-            : 0,
-      }))
+    // Calculate averages for teams
+    teamStats.forEach(stats => {
+      stats.averagePins = stats.sessionsPlayed > 0
+        ? Math.round(stats.totalPins / stats.sessionsPlayed)
+        : 0;
+    });
+
+    // Group team standings by group
+    const groupedStandings: GroupedStandings[] = [];
+
+    // Add standings for each group
+    tournament.groups.forEach(group => {
+      const groupTeams = Array.from(teamStats.values())
+        .filter(team => team.groupId === group.id)
+        .sort((a, b) => {
+          if (b.totalPoints !== a.totalPoints) {
+            return b.totalPoints - a.totalPoints;
+          }
+          return b.totalPins - a.totalPins;
+        });
+
+      groupedStandings.push({
+        groupId: group.id,
+        groupName: group.name,
+        teams: groupTeams,
+      });
+    });
+
+    // Add ungrouped teams
+    const ungroupedTeams = Array.from(teamStats.values())
+      .filter(team => team.groupId === null)
       .sort((a, b) => {
         if (b.totalPoints !== a.totalPoints) {
           return b.totalPoints - a.totalPoints;
@@ -229,13 +299,56 @@ export async function GET(
         return b.totalPins - a.totalPins;
       });
 
-    // Sort player standings by average
-    const playerStandings = playerStandingsArray.sort((a, b) => {
-      if (b.average !== a.average) {
-        return b.average - a.average;
-      }
-      return b.totalPins - a.totalPins;
+    if (ungroupedTeams.length > 0) {
+      groupedStandings.push({
+        groupId: null,
+        groupName: 'Ungrouped',
+        teams: ungroupedTeams,
+      });
+    }
+
+    // Group player standings by category
+    const categorizedStandings: CategorizedStandings[] = [];
+
+    // Add standings for each category
+    tournament.playerCategories.forEach(category => {
+      const categoryPlayers = playerStandingsArray
+        .filter(player => player.categoryId === category.id)
+        .sort((a, b) => {
+          if (b.average !== a.average) {
+            return b.average - a.average;
+          }
+          return b.totalPins - a.totalPins;
+        });
+
+      categorizedStandings.push({
+        categoryId: category.id,
+        categoryName: category.name,
+        minAverage: category.minAverage,
+        maxAverage: category.maxAverage,
+        players: categoryPlayers,
+      });
     });
+
+    // Add uncategorized players
+    const uncategorizedPlayers = playerStandingsArray
+      .filter(player => player.categoryId === null)
+      .sort((a, b) => {
+        if (b.average !== a.average) {
+          return b.average - a.average;
+        }
+        return b.totalPins - a.totalPins;
+      });
+
+    if (uncategorizedPlayers.length > 0) {
+      categorizedStandings.push({
+        categoryId: null,
+        categoryName: 'Uncategorized',
+        minAverage: null,
+        maxAverage: null,
+        players: uncategorizedPlayers,
+      });
+    }
 
     return successResponse({
       tournament: {
@@ -249,8 +362,10 @@ export async function GET(
           0
         ),
       },
-      teamStandings,
-      playerStandings,
+      groups: tournament.groups,
+      categories: tournament.playerCategories,
+      groupedStandings,
+      categorizedStandings,
     });
   } catch (error) {
     return handleApiError(error);
