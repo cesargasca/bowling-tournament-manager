@@ -181,6 +181,31 @@ export default function TournamentDetailPage() {
     }
   };
 
+  const autoAssignCategories = async () => {
+    if (!confirm('Auto-assign unassigned players to categories based on their current average? This only affects players who are not yet assigned to a category.')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `/api/tournaments/${tournamentId}/categories/auto-assign`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+
+      if (response.ok) {
+        const result = await response.json();
+        alert(result.data.message);
+        fetchTournamentDetails();
+      }
+    } catch (err) {
+      console.error('Failed to auto-assign:', err);
+      alert('Failed to auto-assign players');
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center">
@@ -458,54 +483,77 @@ export default function TournamentDetailPage() {
           <div className="space-y-6">
             {/* Create New Category */}
             {managementMode && (
-              <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg p-4">
-                <h3 className="font-semibold text-zinc-900 dark:text-zinc-50 mb-3">
-                  Create New Category
-                </h3>
-                <div className="flex gap-3 items-end">
-                  <div className="flex-1">
-                    <label className="block text-sm text-zinc-600 dark:text-zinc-400 mb-1">
-                      Category Name
-                    </label>
-                    <input
-                      type="text"
-                      value={newCategoryName}
-                      onChange={(e) => setNewCategoryName(e.target.value)}
-                      placeholder="e.g., Pro, Advanced, Intermediate"
-                      className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50"
-                    />
+              <div className="space-y-3">
+                <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg p-4">
+                  <h3 className="font-semibold text-zinc-900 dark:text-zinc-50 mb-3">
+                    Create New Category
+                  </h3>
+                  <div className="flex gap-3 items-end">
+                    <div className="flex-1">
+                      <label className="block text-sm text-zinc-600 dark:text-zinc-400 mb-1">
+                        Category Name
+                      </label>
+                      <input
+                        type="text"
+                        value={newCategoryName}
+                        onChange={(e) => setNewCategoryName(e.target.value)}
+                        placeholder="e.g., Pro, Advanced, Intermediate"
+                        className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-zinc-600 dark:text-zinc-400 mb-1">
+                        Min Avg (optional)
+                      </label>
+                      <input
+                        type="number"
+                        value={newCategoryMin}
+                        onChange={(e) => setNewCategoryMin(e.target.value)}
+                        placeholder="150"
+                        className="w-24 px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-zinc-600 dark:text-zinc-400 mb-1">
+                        Max Avg (optional)
+                      </label>
+                      <input
+                        type="number"
+                        value={newCategoryMax}
+                        onChange={(e) => setNewCategoryMax(e.target.value)}
+                        placeholder="200"
+                        className="w-24 px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50"
+                      />
+                    </div>
+                    <button
+                      onClick={createCategory}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      Create Category
+                    </button>
                   </div>
-                  <div>
-                    <label className="block text-sm text-zinc-600 dark:text-zinc-400 mb-1">
-                      Min Avg (optional)
-                    </label>
-                    <input
-                      type="number"
-                      value={newCategoryMin}
-                      onChange={(e) => setNewCategoryMin(e.target.value)}
-                      placeholder="150"
-                      className="w-24 px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm text-zinc-600 dark:text-zinc-400 mb-1">
-                      Max Avg (optional)
-                    </label>
-                    <input
-                      type="number"
-                      value={newCategoryMax}
-                      onChange={(e) => setNewCategoryMax(e.target.value)}
-                      placeholder="200"
-                      className="w-24 px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50"
-                    />
-                  </div>
-                  <button
-                    onClick={createCategory}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    Create Category
-                  </button>
                 </div>
+                {data.categories.length > 0 && (
+                  <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900 rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="font-semibold text-zinc-900 dark:text-zinc-50">
+                          Auto-Assign Players to Categories
+                        </h3>
+                        <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
+                          Automatically assign unassigned players to categories based on their current average.
+                          Once assigned, players stay in their category for the entire tournament.
+                        </p>
+                      </div>
+                      <button
+                        onClick={autoAssignCategories}
+                        className="ml-4 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors whitespace-nowrap"
+                      >
+                        Auto-Assign
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
