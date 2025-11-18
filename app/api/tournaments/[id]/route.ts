@@ -39,6 +39,12 @@ export async function GET(
             },
           },
         },
+        _count: {
+          select: {
+            teams: true,
+            sessions: true,
+          },
+        },
       },
     })
 
