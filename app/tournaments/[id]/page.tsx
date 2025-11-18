@@ -693,17 +693,28 @@ export default function TournamentDetailPage() {
                   {allPlayers.length > 0 && (
                     <div className="max-h-60 overflow-y-auto space-y-2 p-3 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-300 dark:border-zinc-700">
                       {(() => {
-                        // Filter players based on search query
-                        const filteredPlayers = allPlayers.filter((player: any) =>
+                        // Get all player IDs already in teams for this tournament
+                        const playersInTeams = new Set<number>();
+                        teams.forEach((team: any) => {
+                          team.teamPlayers?.forEach((tp: any) => {
+                            playersInTeams.add(tp.playerId);
+                          });
+                        });
+
+                        // Filter out players already in teams and apply search query
+                        const availablePlayers = allPlayers.filter((player: any) =>
+                          !playersInTeams.has(player.id) &&
                           player.name.toLowerCase().includes(playerSearchQuery.toLowerCase())
                         );
 
-                        return filteredPlayers.length === 0 ? (
+                        return availablePlayers.length === 0 ? (
                           <div className="text-center text-zinc-600 dark:text-zinc-400 py-4">
-                            {playerSearchQuery ? 'No players found matching your search' : 'No available players'}
+                            {playerSearchQuery
+                              ? 'No available players found matching your search'
+                              : 'No available players. All players are already assigned to teams.'}
                           </div>
                         ) : (
-                          filteredPlayers.map((player: any) => (
+                          availablePlayers.map((player: any) => (
                             <label
                               key={player.id}
                               className="flex items-center gap-3 p-2 rounded hover:bg-zinc-50 dark:hover:bg-zinc-800 cursor-pointer"

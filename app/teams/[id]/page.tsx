@@ -50,6 +50,7 @@ export default function TeamDetailPage() {
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<number[]>([]);
   const [availablePlayers, setAvailablePlayers] = useState<Player[]>([]);
   const [saving, setSaving] = useState(false);
+  const [playerSearchQuery, setPlayerSearchQuery] = useState('');
 
   useEffect(() => {
     fetchTeamDetails();
@@ -345,32 +346,54 @@ export default function TeamDetailPage() {
                 )}
               </div>
 
+              {/* Player Search */}
+              {availablePlayers.length > 0 && (
+                <div className="mb-3">
+                  <input
+                    type="text"
+                    value={playerSearchQuery}
+                    onChange={(e) => setPlayerSearchQuery(e.target.value)}
+                    placeholder="Search players..."
+                    className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50"
+                  />
+                </div>
+              )}
+
               <div className="space-y-2 max-h-96 overflow-y-auto">
-                {availablePlayers.length === 0 ? (
-                  <div className="p-8 text-center text-zinc-600 dark:text-zinc-400">
-                    No available players. All players are already assigned to teams in this tournament.
-                  </div>
-                ) : (
-                  availablePlayers.map((player) => (
-                    <label
-                      key={player.id}
-                      className="flex items-center gap-3 p-3 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer transition-colors"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedPlayerIds.includes(player.id)}
-                        onChange={() => handlePlayerToggle(player.id)}
-                        className="w-4 h-4 rounded border-zinc-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500"
-                      />
-                      <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-                        <span className="text-blue-600 dark:text-blue-400 text-sm font-semibold">
-                          {player.name.charAt(0).toUpperCase()}
-                        </span>
-                      </div>
-                      <span className="text-zinc-900 dark:text-zinc-50">{player.name}</span>
-                    </label>
-                  ))
-                )}
+                {(() => {
+                  // Filter players based on search query
+                  const filteredPlayers = availablePlayers.filter((player) =>
+                    player.name.toLowerCase().includes(playerSearchQuery.toLowerCase())
+                  );
+
+                  return filteredPlayers.length === 0 ? (
+                    <div className="p-8 text-center text-zinc-600 dark:text-zinc-400">
+                      {playerSearchQuery
+                        ? 'No players found matching your search'
+                        : 'No available players. All players are already assigned to teams in this tournament.'}
+                    </div>
+                  ) : (
+                    filteredPlayers.map((player) => (
+                      <label
+                        key={player.id}
+                        className="flex items-center gap-3 p-3 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer transition-colors"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedPlayerIds.includes(player.id)}
+                          onChange={() => handlePlayerToggle(player.id)}
+                          className="w-4 h-4 rounded border-zinc-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500"
+                        />
+                        <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                          <span className="text-blue-600 dark:text-blue-400 text-sm font-semibold">
+                            {player.name.charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                        <span className="text-zinc-900 dark:text-zinc-50">{player.name}</span>
+                      </label>
+                    ))
+                  );
+                })()}
               </div>
 
               {/* Action Buttons */}
