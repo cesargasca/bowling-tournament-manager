@@ -85,6 +85,7 @@ export default function TournamentDetailPage() {
   const [newTeamPlayerIds, setNewTeamPlayerIds] = useState<number[]>([]);
   const [allPlayers, setAllPlayers] = useState<any[]>([]);
   const [creatingTeam, setCreatingTeam] = useState(false);
+  const [playerSearchQuery, setPlayerSearchQuery] = useState('');
 
   // Bulk selection states
   const [selectedTeamIds, setSelectedTeamIds] = useState<Set<number>>(new Set());
@@ -675,27 +676,34 @@ export default function TournamentDetailPage() {
                     {newTeamPlayerIds.length} / {data.tournament.teamSize} player{data.tournament.teamSize !== 1 ? 's' : ''} selected
                   </div>
 
+                  {/* Player Search */}
+                  {allPlayers.length > 0 && (
+                    <div>
+                      <input
+                        type="text"
+                        value={playerSearchQuery}
+                        onChange={(e) => setPlayerSearchQuery(e.target.value)}
+                        placeholder="Search players..."
+                        className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50 mb-2"
+                      />
+                    </div>
+                  )}
+
                   {/* Available Players */}
                   {allPlayers.length > 0 && (
                     <div className="max-h-60 overflow-y-auto space-y-2 p-3 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-300 dark:border-zinc-700">
                       {(() => {
-                        // Get all player IDs already in teams for this tournament
-                        const playersInTeams = new Set<number>();
-                        data.groupedStandings.forEach((group) => {
-                          group.teams.forEach((team) => {
-                            // This would need to be fetched from team details, but for now we'll allow all
-                            // The API will handle the validation
-                          });
-                        });
+                        // Filter players based on search query
+                        const filteredPlayers = allPlayers.filter((player: any) =>
+                          player.name.toLowerCase().includes(playerSearchQuery.toLowerCase())
+                        );
 
-                        const availablePlayers = allPlayers;
-
-                        return availablePlayers.length === 0 ? (
+                        return filteredPlayers.length === 0 ? (
                           <div className="text-center text-zinc-600 dark:text-zinc-400 py-4">
-                            No available players
+                            {playerSearchQuery ? 'No players found matching your search' : 'No available players'}
                           </div>
                         ) : (
-                          availablePlayers.map((player: any) => (
+                          filteredPlayers.map((player: any) => (
                             <label
                               key={player.id}
                               className="flex items-center gap-3 p-2 rounded hover:bg-zinc-50 dark:hover:bg-zinc-800 cursor-pointer"
