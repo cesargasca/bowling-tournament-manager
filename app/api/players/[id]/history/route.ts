@@ -158,22 +158,26 @@ export async function GET(
       })
     )
 
-    // Calculate summary statistics
+    // Calculate summary statistics (excluding absent sessions where all lines are 0)
+    const playedSessions = sessionHistory.filter((s) => s.scores.rawTotal > 0)
     const totalSessions = sessionHistory.length
-    const totalGames = totalSessions * 3 // 3 lines per session
-    const totalPins = sessionHistory.reduce((sum, s) => sum + s.scores.rawTotal, 0)
+    const totalGames = playedSessions.length * 3 // 3 lines per session actually played
+    const totalPins = playedSessions.reduce((sum, s) => sum + s.scores.rawTotal, 0)
     const average = totalGames > 0 ? Math.round((totalPins / totalGames) * 10) / 10 : 0
-    const highGame = sessionHistory.reduce(
+
+    // High/low games (only from sessions where player actually played)
+    const highGame = playedSessions.reduce(
       (max, s) => Math.max(max, s.scores.line1, s.scores.line2, s.scores.line3),
       0
     )
     const lowGame =
-      sessionHistory.length > 0
-        ? sessionHistory.reduce((min, s) => {
+      playedSessions.length > 0
+        ? playedSessions.reduce((min, s) => {
             const sessionLow = Math.min(s.scores.line1, s.scores.line2, s.scores.line3)
             return sessionLow > 0 ? Math.min(min, sessionLow) : min
           }, 999)
         : 0
+
     const paidSessions = sessionHistory.filter((s) => s.payment).length
     const paymentRate = totalSessions > 0 ? Math.round((paidSessions / totalSessions) * 100) : 0
 

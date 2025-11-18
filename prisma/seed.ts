@@ -2,10 +2,41 @@ import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
+// Helper function to generate realistic bowling scores
+function generateBowlingScore(skillLevel: 'beginner' | 'intermediate' | 'advanced' | 'absent') {
+  if (skillLevel === 'absent') {
+    return { line1: 0, line2: 0, line3: 0, handicap: 0 }
+  }
+
+  const baseScores = {
+    beginner: { min: 80, max: 140, avgHandicap: 35 },
+    intermediate: { min: 120, max: 180, avgHandicap: 20 },
+    advanced: { min: 160, max: 220, avgHandicap: 5 },
+  }
+
+  const base = baseScores[skillLevel]
+  const variance = 25 // Additional variance per game
+
+  const line1 = Math.floor(Math.random() * (base.max - base.min + variance)) + base.min - variance / 2
+  const line2 = Math.floor(Math.random() * (base.max - base.min + variance)) + base.min - variance / 2
+  const line3 = Math.floor(Math.random() * (base.max - base.min + variance)) + base.min - variance / 2
+
+  // Clamp scores between 0 and 300
+  const clamp = (val: number) => Math.max(0, Math.min(300, val))
+
+  return {
+    line1: clamp(line1),
+    line2: clamp(line2),
+    line3: clamp(line3),
+    handicap: Math.floor(Math.random() * 15) + (base.avgHandicap - 7), // ±7 variance
+  }
+}
+
 async function main() {
   console.log('Starting seed...')
 
   // Clean existing data
+  await prisma.sessionMatchup.deleteMany()
   await prisma.teamPlayerSession.deleteMany()
   await prisma.session.deleteMany()
   await prisma.teamPlayer.deleteMany()
@@ -100,15 +131,23 @@ async function main() {
     'Eric Ross', 'Shirley Henderson', 'Stephen Coleman', 'Brenda Jenkins',
   ]
 
-  const players = []
-  for (const name of playerNames) {
-    const player = await prisma.player.create({
-      data: { name },
-    })
-    players.push(player)
+  // Assign skill levels to players
+  const skillLevels: Array<'beginner' | 'intermediate' | 'advanced'> = []
+  for (let i = 0; i < playerNames.length; i++) {
+    if (i % 3 === 0) skillLevels.push('advanced')
+    else if (i % 3 === 1) skillLevels.push('intermediate')
+    else skillLevels.push('beginner')
   }
 
-  console.log('Created 72 players')
+  const players = []
+  for (let i = 0; i < playerNames.length; i++) {
+    const player = await prisma.player.create({
+      data: { name: playerNames[i] },
+    })
+    players.push({ ...player, skillLevel: skillLevels[i] })
+  }
+
+  console.log('Created 72 players with varying skill levels')
 
   // Create 18 teams for Fall Championship
   const teams = []
@@ -116,7 +155,7 @@ async function main() {
     const lane = lanes[i]
     const team = await prisma.team.create({
       data: {
-        name: `Team ${i + 1}`,
+        name: `Team ${String.fromCharCode(65 + i)}`, // Team A, Team B, etc.
         tournamentId: fallTournament.id,
         laneId: lane.id,
       },
@@ -139,95 +178,108 @@ async function main() {
 
   console.log('Created 18 teams with player assignments')
 
-  // Create 3 sample sessions
+  // Create 5 sessions (game days) with matchups
   const today = new Date()
   const sessions = []
 
-  for (let week = 0; week < 3; week++) {
+  for (let week = 0; week < 5; week++) {
     const sessionDate = new Date(today)
-    sessionDate.setDate(today.getDate() + week * 7)
+    sessionDate.setDate(today.getDate() - (14 - week * 7)) // Sessions from 2 weeks ago to 2 weeks ahead
 
-    // Create sessions for each lane pair
+    const session = await prisma.session.create({
+      data: {
+        tournamentId: fallTournament.id,
+        sessionDate,
+      },
+    })
+
+    sessions.push(session)
+
+    // Create matchups for this session (9 matchups for 18 lanes)
     for (let i = 0; i < lanes.length; i += 2) {
       const lane = lanes[i]
-      const session = await prisma.session.create({
+      const opponentLane = lanes[i + 1]
+
+      // Create matchup
+      const matchup = await prisma.sessionMatchup.create({
         data: {
-          tournamentId: fallTournament.id,
+          sessionId: session.id,
           laneId: lane.id,
-          sessionDate,
+          teamAId: teams[i].id,
+          teamBId: teams[i + 1].id,
         },
       })
 
-      sessions.push(session)
-
-      // Add sample scores for week 0 only
-      if (week === 0) {
-        const team = teams[i]
-        const teamPlayers = await prisma.teamPlayer.findMany({
-          where: { teamId: team.id },
+      // Add scores for both teams (only for past and current sessions)
+      if (week <= 2) {
+        // Team A players
+        const teamAPlayers = await prisma.teamPlayer.findMany({
+          where: { teamId: teams[i].id },
           include: { player: true },
         })
 
-        // Add scores for all 4 players
-        for (const tp of teamPlayers) {
-          const line1 = Math.floor(Math.random() * 100) + 100 // 100-200
-          const line2 = Math.floor(Math.random() * 100) + 100
-          const line3 = Math.floor(Math.random() * 100) + 100
-          const handicap = Math.floor(Math.random() * 30) + 10 // 10-40
+        for (const tp of teamAPlayers) {
+          const playerData = players.find((p) => p.id === tp.playerId)!
+          // 10% chance player is absent
+          const isAbsent = Math.random() < 0.1
+          const scores = generateBowlingScore(isAbsent ? 'absent' : playerData.skillLevel)
 
           await prisma.teamPlayerSession.create({
             data: {
               teamPlayerId: tp.id,
               sessionId: session.id,
               laneId: lane.id,
-              line1,
-              line2,
-              line3,
-              handicap,
-              assistance: true,
-              payment: Math.random() > 0.2, // 80% paid
+              line1: scores.line1,
+              line2: scores.line2,
+              line3: scores.line3,
+              handicap: scores.handicap,
+              assistance: !isAbsent,
+              payment: isAbsent ? false : Math.random() > 0.15, // 85% payment rate
             },
           })
         }
 
-        // Add scores for opponent team
-        if (i + 1 < teams.length) {
-          const opponentTeam = teams[i + 1]
-          const opponentTeamPlayers = await prisma.teamPlayer.findMany({
-            where: { teamId: opponentTeam.id },
-            include: { player: true },
+        // Team B players
+        const teamBPlayers = await prisma.teamPlayer.findMany({
+          where: { teamId: teams[i + 1].id },
+          include: { player: true },
+        })
+
+        for (const tp of teamBPlayers) {
+          const playerData = players.find((p) => p.id === tp.playerId)!
+          // 10% chance player is absent
+          const isAbsent = Math.random() < 0.1
+          const scores = generateBowlingScore(isAbsent ? 'absent' : playerData.skillLevel)
+
+          await prisma.teamPlayerSession.create({
+            data: {
+              teamPlayerId: tp.id,
+              sessionId: session.id,
+              laneId: opponentLane.id,
+              line1: scores.line1,
+              line2: scores.line2,
+              line3: scores.line3,
+              handicap: scores.handicap,
+              assistance: !isAbsent,
+              payment: isAbsent ? false : Math.random() > 0.15,
+            },
           })
-
-          const opponentLane = lanes[i + 1]
-
-          for (const tp of opponentTeamPlayers) {
-            const line1 = Math.floor(Math.random() * 100) + 100
-            const line2 = Math.floor(Math.random() * 100) + 100
-            const line3 = Math.floor(Math.random() * 100) + 100
-            const handicap = Math.floor(Math.random() * 30) + 10
-
-            await prisma.teamPlayerSession.create({
-              data: {
-                teamPlayerId: tp.id,
-                sessionId: session.id,
-                laneId: opponentLane.id,
-                line1,
-                line2,
-                line3,
-                handicap,
-                assistance: Math.random() > 0.25, // 75% attended
-                payment: Math.random() > 0.2,
-              },
-            })
-          }
         }
       }
     }
+
+    console.log(`Created session ${week + 1}/5 with matchups ${week <= 2 ? 'and scores' : '(no scores yet)'}`)
   }
 
-  console.log('Created 3 sessions with scores for week 1')
-
   console.log('Seed completed successfully!')
+  console.log('Created:')
+  console.log('- 2 bowling alleys')
+  console.log('- 18 lanes (9 pairs)')
+  console.log('- 2 tournaments')
+  console.log('- 72 players (varying skill levels)')
+  console.log('- 18 teams')
+  console.log('- 5 sessions (3 with scores, 2 upcoming)')
+  console.log('- ~10% absence rate for realistic data')
 }
 
 main()
