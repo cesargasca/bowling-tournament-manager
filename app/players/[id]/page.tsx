@@ -2,6 +2,18 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from 'recharts';
 
 interface PlayerHistory {
   player: {
@@ -185,6 +197,121 @@ export default function PlayerDetailPage() {
             </div>
           </div>
         </div>
+
+        {/* Performance Charts */}
+        {data.sessions.length > 0 && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            {/* Performance Trend Over Time */}
+            <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6">
+              <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-50 mb-4">
+                Performance Trend
+              </h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart
+                  data={data.sessions
+                    .slice()
+                    .reverse()
+                    .map((s, idx) => ({
+                      session: `S${idx + 1}`,
+                      date: new Date(s.sessionDate).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                      }),
+                      'Raw Score': s.scores.rawTotal,
+                      'With Handicap': s.scores.totalWithHandicap,
+                      Average: data.summary.average * 3, // Average per session (3 games)
+                    }))}
+                  margin={{ top: 5, right: 5, left: 0, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-700" />
+                  <XAxis
+                    dataKey="date"
+                    className="text-xs fill-zinc-600 dark:fill-zinc-400"
+                    tick={{ fontSize: 12 }}
+                  />
+                  <YAxis className="text-xs fill-zinc-600 dark:fill-zinc-400" tick={{ fontSize: 12 }} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'rgb(24 24 27)',
+                      border: '1px solid rgb(63 63 70)',
+                      borderRadius: '0.5rem',
+                      color: 'rgb(244 244 245)',
+                    }}
+                  />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="Raw Score"
+                    stroke="#3b82f6"
+                    strokeWidth={2}
+                    dot={{ fill: '#3b82f6', r: 4 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="With Handicap"
+                    stroke="#22c55e"
+                    strokeWidth={2}
+                    dot={{ fill: '#22c55e', r: 4 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="Average"
+                    stroke="#f59e0b"
+                    strokeWidth={2}
+                    strokeDasharray="5 5"
+                    dot={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Individual Game Scores */}
+            <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6">
+              <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-50 mb-4">
+                Game Score Distribution
+              </h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart
+                  data={data.sessions
+                    .slice()
+                    .reverse()
+                    .slice(-10) // Last 10 sessions
+                    .map((s, idx) => ({
+                      session: `S${idx + 1}`,
+                      date: new Date(s.sessionDate).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                      }),
+                      'Line 1': s.scores.line1,
+                      'Line 2': s.scores.line2,
+                      'Line 3': s.scores.line3,
+                    }))}
+                  margin={{ top: 5, right: 5, left: 0, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-700" />
+                  <XAxis
+                    dataKey="date"
+                    className="text-xs fill-zinc-600 dark:fill-zinc-400"
+                    tick={{ fontSize: 12 }}
+                  />
+                  <YAxis className="text-xs fill-zinc-600 dark:fill-zinc-400" tick={{ fontSize: 12 }} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'rgb(24 24 27)',
+                      border: '1px solid rgb(63 63 70)',
+                      borderRadius: '0.5rem',
+                      color: 'rgb(244 244 245)',
+                    }}
+                  />
+                  <Legend />
+                  <Bar dataKey="Line 1" fill="#3b82f6" />
+                  <Bar dataKey="Line 2" fill="#8b5cf6" />
+                  <Bar dataKey="Line 3" fill="#ec4899" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
 
         {/* Filter */}
         {tournaments.length > 1 && (
