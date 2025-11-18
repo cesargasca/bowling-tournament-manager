@@ -39,7 +39,17 @@ export async function GET(
     const sessions = await prisma.session.findMany({
       where: { tournamentId },
       include: {
-        lane: true,
+        sessionMatchups: {
+          include: {
+            lane: {
+              include: {
+                opponentLane: true,
+              },
+            },
+            teamA: true,
+            teamB: true,
+          },
+        },
         teamPlayerSessions: {
           include: {
             teamPlayer: {
@@ -71,33 +81,36 @@ export async function GET(
 
     // Calculate standings from session results
     for (const session of sessions) {
-      const laneId = session.laneId
-      const opponentLaneId = session.lane.opponentLaneId
+      // Process each matchup in the session
+      for (const matchup of session.sessionMatchups) {
+        if (!matchup.lane.opponentLane) continue
+        if (!matchup.teamA || !matchup.teamB) continue
 
-      if (!opponentLaneId) continue
+        const laneId = matchup.laneId
+        const opponentLaneId = matchup.lane.opponentLane.id
 
-      // Get sessions for both lanes
-      const teamAPlayerSessions = session.teamPlayerSessions.filter(
-        (tps) => tps.laneId === laneId
-      )
-      const teamBPlayerSessions = session.teamPlayerSessions.filter(
-        (tps) => tps.laneId === opponentLaneId
-      )
+        // Get player sessions for both teams in this matchup
+        const teamAPlayerSessions = session.teamPlayerSessions.filter(
+          (tps) => tps.laneId === laneId && tps.teamPlayer.teamId === matchup.teamAId
+        )
+        const teamBPlayerSessions = session.teamPlayerSessions.filter(
+          (tps) => tps.laneId === opponentLaneId && tps.teamPlayer.teamId === matchup.teamBId
+        )
 
-      if (teamAPlayerSessions.length === 0 || teamBPlayerSessions.length === 0) {
-        continue // No scores entered yet
-      }
+        if (teamAPlayerSessions.length === 0 || teamBPlayerSessions.length === 0) {
+          continue // No scores entered yet
+        }
 
-      try {
-        // Calculate scores and points
-        const teamAScores = calculateLineScores(teamAPlayerSessions as any)
-        const teamBScores = calculateLineScores(teamBPlayerSessions as any)
-        const points = calculateSessionPoints(teamAScores, teamBScores)
+        try {
+          // Calculate scores and points
+          const teamAScores = calculateLineScores(teamAPlayerSessions as any)
+          const teamBScores = calculateLineScores(teamBPlayerSessions as any)
+          const points = calculateSessionPoints(teamAScores, teamBScores)
 
-        // Update team A stats
-        const teamAStats = teamStats.get(teamAScores.teamId)
-        if (teamAStats) {
-          teamAStats.totalPoints += points.teamAPoints
+          // Update team A stats
+          const teamAStats = teamStats.get(teamAScores.teamId)
+          if (teamAStats) {
+            teamAStats.totalPoints += points.teamAPoints
           teamAStats.sessionsPlayed++
           teamAStats.totalPins += teamAScores.totalPins
 
@@ -106,22 +119,23 @@ export async function GET(
           else teamAStats.ties++
         }
 
-        // Update team B stats
-        const teamBStats = teamStats.get(teamBScores.teamId)
-        if (teamBStats) {
-          teamBStats.totalPoints += points.teamBPoints
-          teamBStats.sessionsPlayed++
-          teamBStats.totalPins += teamBScores.totalPins
+          // Update team B stats
+          const teamBStats = teamStats.get(teamBScores.teamId)
+          if (teamBStats) {
+            teamBStats.totalPoints += points.teamBPoints
+            teamBStats.sessionsPlayed++
+            teamBStats.totalPins += teamBScores.totalPins
 
-          if (points.teamBPoints > points.teamAPoints) teamBStats.wins++
-          else if (points.teamBPoints < points.teamAPoints) teamBStats.losses++
-          else teamBStats.ties++
+            if (points.teamBPoints > points.teamAPoints) teamBStats.wins++
+            else if (points.teamBPoints < points.teamAPoints) teamBStats.losses++
+            else teamBStats.ties++
+          }
+        } catch (error) {
+          console.error('Error calculating matchup points:', error)
+          continue
         }
-      } catch (error) {
-        console.error('Error calculating session points:', error)
-        continue
-      }
-    }
+      } // End of matchup loop
+    } // End of session loop
 
     // Calculate averages and sort by total points
     const standings = Array.from(teamStats.values())

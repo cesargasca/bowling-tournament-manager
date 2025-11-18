@@ -79,7 +79,17 @@ export async function GET(
         },
         sessions: {
           include: {
-            lane: true,
+            sessionMatchups: {
+              include: {
+                lane: {
+                  include: {
+                    opponentLane: true,
+                  },
+                },
+                teamA: true,
+                teamB: true,
+              },
+            },
             teamPlayerSessions: {
               include: {
                 teamPlayer: {
@@ -141,97 +151,101 @@ export async function GET(
 
     // Calculate team standings from session results
     for (const session of tournament.sessions) {
-      const laneId = session.laneId;
-      const opponentLaneId = session.lane.opponentLaneId;
+      // Process each matchup in the session
+      for (const matchup of session.sessionMatchups) {
+        if (!matchup.lane.opponentLane) continue;
+        if (!matchup.teamA || !matchup.teamB) continue;
 
-      if (!opponentLaneId) continue;
+        const laneId = matchup.laneId;
+        const opponentLaneId = matchup.lane.opponentLane.id;
 
-      // Get sessions for both lanes
-      const teamAPlayerSessions = session.teamPlayerSessions.filter(
-        (tps) => tps.laneId === laneId
-      );
-      const teamBPlayerSessions = session.teamPlayerSessions.filter(
-        (tps) => tps.laneId === opponentLaneId
-      );
+        // Get player sessions for both teams in this matchup
+        const teamAPlayerSessions = session.teamPlayerSessions.filter(
+          (tps) => tps.laneId === laneId && tps.teamPlayer.teamId === matchup.teamAId
+        );
+        const teamBPlayerSessions = session.teamPlayerSessions.filter(
+          (tps) => tps.laneId === opponentLaneId && tps.teamPlayer.teamId === matchup.teamBId
+        );
 
-      if (teamAPlayerSessions.length === 0 || teamBPlayerSessions.length === 0) {
-        continue;
-      }
-
-      try {
-        // Calculate scores and points for team standings
-        const teamAScores = calculateLineScores(teamAPlayerSessions as any);
-        const teamBScores = calculateLineScores(teamBPlayerSessions as any);
-        const points = calculateSessionPoints(teamAScores, teamBScores);
-
-        // Update team A stats
-        const teamAStats = teamStats.get(teamAScores.teamId);
-        if (teamAStats) {
-          teamAStats.totalPoints += points.teamAPoints;
-          teamAStats.sessionsPlayed++;
-          teamAStats.totalPins += teamAScores.totalPins;
-
-          if (points.teamAPoints > points.teamBPoints) teamAStats.wins++;
-          else if (points.teamAPoints < points.teamBPoints) teamAStats.losses++;
-          else teamAStats.ties++;
+        if (teamAPlayerSessions.length === 0 || teamBPlayerSessions.length === 0) {
+          continue;
         }
 
-        // Update team B stats
-        const teamBStats = teamStats.get(teamBScores.teamId);
-        if (teamBStats) {
-          teamBStats.totalPoints += points.teamBPoints;
-          teamBStats.sessionsPlayed++;
-          teamBStats.totalPins += teamBScores.totalPins;
+        try {
+          // Calculate scores and points for team standings
+          const teamAScores = calculateLineScores(teamAPlayerSessions as any);
+          const teamBScores = calculateLineScores(teamBPlayerSessions as any);
+          const points = calculateSessionPoints(teamAScores, teamBScores);
 
-          if (points.teamBPoints > points.teamAPoints) teamBStats.wins++;
-          else if (points.teamBPoints < points.teamAPoints) teamBStats.losses++;
-          else teamBStats.ties++;
+          // Update team A stats
+          const teamAStats = teamStats.get(teamAScores.teamId);
+          if (teamAStats) {
+            teamAStats.totalPoints += points.teamAPoints;
+            teamAStats.sessionsPlayed++;
+            teamAStats.totalPins += teamAScores.totalPins;
+
+            if (points.teamAPoints > points.teamBPoints) teamAStats.wins++;
+            else if (points.teamAPoints < points.teamBPoints) teamAStats.losses++;
+            else teamAStats.ties++;
+          }
+
+          // Update team B stats
+          const teamBStats = teamStats.get(teamBScores.teamId);
+          if (teamBStats) {
+            teamBStats.totalPoints += points.teamBPoints;
+            teamBStats.sessionsPlayed++;
+            teamBStats.totalPins += teamBScores.totalPins;
+
+            if (points.teamBPoints > points.teamAPoints) teamBStats.wins++;
+            else if (points.teamBPoints < points.teamAPoints) teamBStats.losses++;
+            else teamBStats.ties++;
+          }
+
+          // Calculate individual player statistics (without handicap)
+          const allPlayerSessions = [...teamAPlayerSessions, ...teamBPlayerSessions];
+          for (const tps of allPlayerSessions) {
+            const playerId = tps.teamPlayer.playerId;
+            const playerName = tps.teamPlayer.player.name;
+            const teamName = tps.teamPlayer.team.name;
+
+            if (!playerStats.has(playerId)) {
+              const categoryInfo = playerCategoryMap.get(playerId);
+              playerStats.set(playerId, {
+                playerId,
+                playerName,
+                teamName,
+                categoryId: categoryInfo?.categoryId || null,
+                categoryName: categoryInfo?.categoryName || null,
+                isManualCategory: categoryInfo?.isManual || false,
+                gamesPlayed: 0,
+                totalPins: 0,
+                average: 0,
+                highGame: 0,
+                lowGame: 999,
+                attendanceRate: 0,
+                paymentRate: 0,
+              });
+            }
+
+            const stats = playerStats.get(playerId)!;
+
+            // Add games (3 lines per session = 3 games)
+            const games = [tps.line1, tps.line2, tps.line3];
+            stats.gamesPlayed += 3;
+            stats.totalPins += tps.line1 + tps.line2 + tps.line3;
+
+            // Update high/low game
+            for (const game of games) {
+              if (game > stats.highGame) stats.highGame = game;
+              if (game < stats.lowGame) stats.lowGame = game;
+            }
+          }
+        } catch (error) {
+          console.error('Error calculating matchup points:', error);
+          continue;
         }
-      } catch (error) {
-        console.error('Error calculating session points:', error);
-        continue;
-      }
-
-      // Calculate individual player statistics (without handicap)
-      const allPlayerSessions = [...teamAPlayerSessions, ...teamBPlayerSessions];
-      for (const tps of allPlayerSessions) {
-        const playerId = tps.teamPlayer.playerId;
-        const playerName = tps.teamPlayer.player.name;
-        const teamName = tps.teamPlayer.team.name;
-
-        if (!playerStats.has(playerId)) {
-          const categoryInfo = playerCategoryMap.get(playerId);
-          playerStats.set(playerId, {
-            playerId,
-            playerName,
-            teamName,
-            categoryId: categoryInfo?.categoryId || null,
-            categoryName: categoryInfo?.categoryName || null,
-            isManualCategory: categoryInfo?.isManual || false,
-            gamesPlayed: 0,
-            totalPins: 0,
-            average: 0,
-            highGame: 0,
-            lowGame: 999,
-            attendanceRate: 0,
-            paymentRate: 0,
-          });
-        }
-
-        const stats = playerStats.get(playerId)!;
-
-        // Add games (3 lines per session = 3 games)
-        const games = [tps.line1, tps.line2, tps.line3];
-        stats.gamesPlayed += 3;
-        stats.totalPins += tps.line1 + tps.line2 + tps.line3;
-
-        // Update high/low game
-        for (const game of games) {
-          if (game > stats.highGame) stats.highGame = game;
-          if (game < stats.lowGame) stats.lowGame = game;
-        }
-      }
-    }
+      } // End of matchup loop
+    } // End of session loop
 
     // Calculate player averages and attendance/payment rates
     const playerStandingsArray: PlayerStanding[] = [];

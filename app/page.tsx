@@ -42,7 +42,7 @@ interface DashboardData {
     tournament: string;
     bowlingAlley: string;
     sessionDate: string;
-    laneNumber: number;
+    matchupsCount: number;
     createdAt: string;
   }>;
   topPlayers: Array<{
@@ -406,7 +406,7 @@ export default function AdminDashboard() {
                       Date
                     </th>
                     <th className="text-center py-3 px-4 text-zinc-700 dark:text-zinc-300 font-semibold">
-                      Lane
+                      Matchups
                     </th>
                   </tr>
                 </thead>
@@ -426,7 +426,7 @@ export default function AdminDashboard() {
                         {new Date(session.sessionDate).toLocaleDateString()}
                       </td>
                       <td className="py-3 px-4 text-center text-zinc-900 dark:text-zinc-50">
-                        {session.laneNumber || 'N/A'}
+                        {session.matchupsCount} match{session.matchupsCount !== 1 ? 'es' : ''}
                       </td>
                     </tr>
                   ))}
