@@ -100,7 +100,7 @@ export default function EditTournamentPage() {
         body: JSON.stringify({
           name: tournamentName,
           bowlingId: parseInt(selectedBowlingId),
-          teamSize: parseInt(teamSize),
+          // Team size is locked and cannot be changed after creation
         }),
       });
 
@@ -251,17 +251,12 @@ export default function EditTournamentPage() {
                 min="1"
                 max="10"
                 value={teamSize}
-                onChange={(e) => setTeamSize(e.target.value)}
-                className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50"
+                disabled
+                className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-500 cursor-not-allowed"
               />
               <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">
-                Each team in this tournament will require exactly {teamSize} player{teamSize !== '1' ? 's' : ''}
+                Team size cannot be changed after tournament creation. Each team requires exactly {teamSize} player{teamSize !== '1' ? 's' : ''}.
               </p>
-              {tournament._count.teams > 0 && (
-                <p className="mt-2 text-xs text-orange-600 dark:text-orange-400">
-                  ⚠️ Warning: This tournament has {tournament._count.teams} existing team(s). Changing team size may affect existing teams.
-                </p>
-              )}
             </div>
 
             {/* Action Buttons */}
