@@ -373,6 +373,7 @@ export async function GET(
         id: tournament.id,
         name: tournament.name,
         bowlingAlley: tournament.bowling.name,
+        teamSize: tournament.teamSize,
         teamsCount: tournament.teams.length,
         sessionsCount: tournament.sessions.length,
         playersCount: tournament.teams.reduce(

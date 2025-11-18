@@ -24,6 +24,7 @@ model Tournament {
   id                       Int                       @id @default(autoincrement())
   name                     String
   bowlingId                Int
+  teamSize                 Int                       @default(4) // Number of players per team
   bowling                  Bowling                   @relation(fields: [bowlingId], references: [id])
   sessions                 Session[]
   teams                    Team[]

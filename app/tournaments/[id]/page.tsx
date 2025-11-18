@@ -8,6 +8,7 @@ interface TournamentDetails {
     id: number;
     name: string;
     bowlingAlley: string;
+    teamSize: number;
     teamsCount: number;
     sessionsCount: number;
     playersCount: number;
@@ -79,6 +80,13 @@ export default function TournamentDetailPage() {
   const [newCategoryMin, setNewCategoryMin] = useState('');
   const [newCategoryMax, setNewCategoryMax] = useState('');
 
+  // Team creation states
+  const [newTeamName, setNewTeamName] = useState('');
+  const [newTeamPlayerIds, setNewTeamPlayerIds] = useState<number[]>([]);
+  const [allPlayers, setAllPlayers] = useState<any[]>([]);
+  const [creatingTeam, setCreatingTeam] = useState(false);
+  const [playerSearchQuery, setPlayerSearchQuery] = useState('');
+
   // Bulk selection states
   const [selectedTeamIds, setSelectedTeamIds] = useState<Set<number>>(new Set());
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<Set<number>>(new Set());
@@ -95,6 +103,12 @@ export default function TournamentDetailPage() {
   useEffect(() => {
     fetchTournamentDetails();
   }, [tournamentId]);
+
+  useEffect(() => {
+    if (managementMode) {
+      fetchAllPlayers();
+    }
+  }, [managementMode]);
 
   const fetchTournamentDetails = async () => {
     try {
@@ -174,6 +188,73 @@ export default function TournamentDetailPage() {
     } catch (err) {
       console.error('Failed to create category:', err);
     }
+  };
+
+  const fetchAllPlayers = async () => {
+    try {
+      const response = await fetch('/api/players');
+      const result = await response.json();
+      if (result.success) {
+        setAllPlayers(result.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch players:', err);
+    }
+  };
+
+  const createTeam = async () => {
+    if (!newTeamName.trim()) {
+      alert('Please enter a team name');
+      return;
+    }
+
+    if (!data) return;
+
+    if (newTeamPlayerIds.length !== data.tournament.teamSize) {
+      alert(
+        `Please select exactly ${data.tournament.teamSize} player${data.tournament.teamSize !== 1 ? 's' : ''} for this tournament`
+      );
+      return;
+    }
+
+    try {
+      setCreatingTeam(true);
+      const response = await fetch('/api/teams', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newTeamName,
+          tournamentId: parseInt(tournamentId),
+          playerIds: newTeamPlayerIds,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setNewTeamName('');
+        setNewTeamPlayerIds([]);
+        fetchTournamentDetails();
+        alert('Team created successfully!');
+      } else {
+        alert(result.error || 'Failed to create team');
+      }
+    } catch (err) {
+      console.error('Failed to create team:', err);
+      alert('Network error - failed to create team');
+    } finally {
+      setCreatingTeam(false);
+    }
+  };
+
+  const togglePlayerForNewTeam = (playerId: number) => {
+    setNewTeamPlayerIds((prev) => {
+      if (prev.includes(playerId)) {
+        return prev.filter((id) => id !== playerId);
+      } else {
+        return [...prev, playerId];
+      }
+    });
   };
 
   const moveTeamToGroup = async (teamId: number, groupId: number | null) => {
@@ -564,6 +645,110 @@ export default function TournamentDetailPage() {
               </div>
             )}
 
+            {/* Create New Team */}
+            {managementMode && data && (
+              <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900 rounded-lg p-4">
+                <h3 className="font-semibold text-zinc-900 dark:text-zinc-50 mb-3">
+                  Create New Team
+                  <span className="ml-2 text-sm font-normal text-zinc-600 dark:text-zinc-400">
+                    (Select exactly {data.tournament.teamSize} player{data.tournament.teamSize !== 1 ? 's' : ''})
+                  </span>
+                </h3>
+
+                <div className="space-y-3">
+                  {/* Team Name Input */}
+                  <input
+                    type="text"
+                    value={newTeamName}
+                    onChange={(e) => setNewTeamName(e.target.value)}
+                    placeholder="Team name (e.g., Lightning Strikes)"
+                    className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50"
+                  />
+
+                  {/* Player Selection Counter */}
+                  <div
+                    className={`text-sm font-medium ${
+                      newTeamPlayerIds.length === data.tournament.teamSize
+                        ? 'text-green-600 dark:text-green-400'
+                        : 'text-orange-600 dark:text-orange-400'
+                    }`}
+                  >
+                    {newTeamPlayerIds.length} / {data.tournament.teamSize} player{data.tournament.teamSize !== 1 ? 's' : ''} selected
+                  </div>
+
+                  {/* Player Search */}
+                  {allPlayers.length > 0 && (
+                    <div>
+                      <input
+                        type="text"
+                        value={playerSearchQuery}
+                        onChange={(e) => setPlayerSearchQuery(e.target.value)}
+                        placeholder="Search players..."
+                        className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50 mb-2"
+                      />
+                    </div>
+                  )}
+
+                  {/* Available Players */}
+                  {allPlayers.length > 0 && (
+                    <div className="max-h-60 overflow-y-auto space-y-2 p-3 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-300 dark:border-zinc-700">
+                      {(() => {
+                        // Get all player IDs already in teams for this tournament
+                        const playersInTeams = new Set<number>();
+                        teams.forEach((team: any) => {
+                          team.teamPlayers?.forEach((tp: any) => {
+                            playersInTeams.add(tp.playerId);
+                          });
+                        });
+
+                        // Filter out players already in teams and apply search query
+                        const availablePlayers = allPlayers.filter((player: any) =>
+                          !playersInTeams.has(player.id) &&
+                          player.name.toLowerCase().includes(playerSearchQuery.toLowerCase())
+                        );
+
+                        return availablePlayers.length === 0 ? (
+                          <div className="text-center text-zinc-600 dark:text-zinc-400 py-4">
+                            {playerSearchQuery
+                              ? 'No available players found matching your search'
+                              : 'No available players. All players are already assigned to teams.'}
+                          </div>
+                        ) : (
+                          availablePlayers.map((player: any) => (
+                            <label
+                              key={player.id}
+                              className="flex items-center gap-3 p-2 rounded hover:bg-zinc-50 dark:hover:bg-zinc-800 cursor-pointer"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={newTeamPlayerIds.includes(player.id)}
+                                onChange={() => togglePlayerForNewTeam(player.id)}
+                                className="w-4 h-4 rounded border-zinc-300 dark:border-zinc-600 text-green-600 focus:ring-green-500"
+                              />
+                              <span className="text-zinc-900 dark:text-zinc-50">{player.name}</span>
+                            </label>
+                          ))
+                        );
+                      })()}
+                    </div>
+                  )}
+
+                  {/* Create Button */}
+                  <button
+                    onClick={createTeam}
+                    disabled={
+                      creatingTeam ||
+                      !newTeamName.trim() ||
+                      newTeamPlayerIds.length !== data.tournament.teamSize
+                    }
+                    className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {creatingTeam ? 'Creating Team...' : 'Create Team'}
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Grouped Standings */}
             {data.groupedStandings.map((group) => (
               <div
@@ -663,8 +848,13 @@ export default function TournamentDetailPage() {
                                 {index + 1}
                               </div>
                             </td>
-                            <td className="py-4 px-6 text-zinc-900 dark:text-zinc-50 font-medium">
-                              {team.teamName}
+                            <td className="py-4 px-6">
+                              <button
+                                onClick={() => router.push(`/teams/${team.teamId}`)}
+                                className="text-zinc-900 dark:text-zinc-50 font-medium hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-left"
+                              >
+                                {team.teamName}
+                              </button>
                             </td>
                             {managementMode && (
                               <td className="py-4 px-6">

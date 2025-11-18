@@ -142,6 +142,7 @@ export default function AdminDashboard() {
             value={data.overview.totalPlayers}
             icon="👥"
             color="bg-green-500"
+            onClick={() => router.push('/players')}
           />
           <StatCard
             title="Teams"
@@ -446,19 +447,39 @@ interface StatCardProps {
   value: number;
   icon: string;
   color: string;
+  onClick?: () => void;
 }
 
-function StatCard({ title, value, icon, color }: StatCardProps) {
+function StatCard({ title, value, icon, color, onClick }: StatCardProps) {
+  const content = (
+    <>
+      <div>
+        <p className="text-zinc-600 dark:text-zinc-400 text-sm font-medium">{title}</p>
+        <p className="text-3xl font-bold text-zinc-900 dark:text-zinc-50 mt-2">{value}</p>
+      </div>
+      <div className={`${color} w-12 h-12 rounded-lg flex items-center justify-center text-2xl`}>
+        {icon}
+      </div>
+    </>
+  );
+
+  if (onClick) {
+    return (
+      <button
+        onClick={onClick}
+        className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6 hover:border-blue-500 dark:hover:border-blue-500 transition-colors w-full"
+      >
+        <div className="flex items-center justify-between">
+          {content}
+        </div>
+      </button>
+    );
+  }
+
   return (
     <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6">
       <div className="flex items-center justify-between">
-        <div>
-          <p className="text-zinc-600 dark:text-zinc-400 text-sm font-medium">{title}</p>
-          <p className="text-3xl font-bold text-zinc-900 dark:text-zinc-50 mt-2">{value}</p>
-        </div>
-        <div className={`${color} w-12 h-12 rounded-lg flex items-center justify-center text-2xl`}>
-          {icon}
-        </div>
+        {content}
       </div>
     </div>
   );
