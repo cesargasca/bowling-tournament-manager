@@ -136,6 +136,7 @@ export default function AdminDashboard() {
             value={data.overview.totalTournaments}
             icon="🏆"
             color="bg-blue-500"
+            onClick={() => router.push('/tournaments')}
           />
           <StatCard
             title="Players"
