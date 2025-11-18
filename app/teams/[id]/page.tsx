@@ -12,6 +12,7 @@ interface Team {
   tournament: {
     id: number;
     name: string;
+    teamSize: number;
   };
   group: {
     id: number;
@@ -131,6 +132,14 @@ export default function TeamDetailPage() {
 
   const handleSave = async () => {
     if (!team) return;
+
+    // Validate team size
+    if (selectedPlayerIds.length !== team.tournament.teamSize) {
+      setError(
+        `Team must have exactly ${team.tournament.teamSize} player${team.tournament.teamSize !== 1 ? 's' : ''} for this tournament`
+      );
+      return;
+    }
 
     try {
       setSaving(true);
@@ -266,8 +275,15 @@ export default function TeamDetailPage() {
         <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
           <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
             <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">Team Members</h2>
-            <span className="text-sm text-zinc-600 dark:text-zinc-400">
-              {selectedPlayerIds.length} player{selectedPlayerIds.length !== 1 ? 's' : ''}
+            <span
+              className={`text-sm font-medium ${
+                selectedPlayerIds.length === team.tournament.teamSize
+                  ? 'text-green-600 dark:text-green-400'
+                  : 'text-orange-600 dark:text-orange-400'
+              }`}
+            >
+              {selectedPlayerIds.length} / {team.tournament.teamSize} player
+              {team.tournament.teamSize !== 1 ? 's' : ''}
             </span>
           </div>
 
@@ -315,8 +331,18 @@ export default function TeamDetailPage() {
             </div>
           ) : (
             <div className="p-6">
-              <div className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">
-                Select players for this team. Players already in other teams in this tournament are not available.
+              <div className="mb-4">
+                <div className="text-sm text-zinc-600 dark:text-zinc-400 mb-2">
+                  Select exactly <span className="font-semibold text-zinc-900 dark:text-zinc-50">{team.tournament.teamSize}</span> player
+                  {team.tournament.teamSize !== 1 ? 's' : ''} for this team. Players already in other teams in this tournament are not available.
+                </div>
+                {selectedPlayerIds.length !== team.tournament.teamSize && (
+                  <div className="text-sm bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded px-3 py-2 text-orange-800 dark:text-orange-200">
+                    {selectedPlayerIds.length < team.tournament.teamSize
+                      ? `Select ${team.tournament.teamSize - selectedPlayerIds.length} more player${team.tournament.teamSize - selectedPlayerIds.length !== 1 ? 's' : ''}`
+                      : `Remove ${selectedPlayerIds.length - team.tournament.teamSize} player${selectedPlayerIds.length - team.tournament.teamSize !== 1 ? 's' : ''}`}
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2 max-h-96 overflow-y-auto">
@@ -351,7 +377,11 @@ export default function TeamDetailPage() {
               <div className="mt-6 flex items-center gap-3">
                 <button
                   onClick={handleSave}
-                  disabled={saving || teamName.trim() === ''}
+                  disabled={
+                    saving ||
+                    teamName.trim() === '' ||
+                    selectedPlayerIds.length !== team.tournament.teamSize
+                  }
                   className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {saving ? 'Saving...' : 'Save Changes'}

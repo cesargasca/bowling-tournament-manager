@@ -52,6 +52,23 @@ export async function POST(request: NextRequest) {
 
     // Create team with team players in a transaction
     const team = await prisma.$transaction(async (tx) => {
+      // Get tournament to check team size requirement
+      const tournament = await tx.tournament.findUnique({
+        where: { id: teamData.tournamentId },
+        select: { teamSize: true, name: true },
+      })
+
+      if (!tournament) {
+        throw new Error('Tournament not found')
+      }
+
+      // Validate team size matches tournament requirement
+      if (playerIds.length !== tournament.teamSize) {
+        throw new Error(
+          `Team must have exactly ${tournament.teamSize} player${tournament.teamSize !== 1 ? 's' : ''} for this tournament`
+        )
+      }
+
       // Check if any player is already in another team in this tournament
       const existingTeamPlayers = await tx.teamPlayer.findMany({
         where: {
@@ -100,6 +117,13 @@ export async function POST(request: NextRequest) {
           teamPlayers: {
             include: {
               player: true,
+            },
+          },
+          tournament: {
+            select: {
+              id: true,
+              name: true,
+              teamSize: true,
             },
           },
         },

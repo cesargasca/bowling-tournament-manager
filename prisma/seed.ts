@@ -97,6 +97,7 @@ async function main() {
     data: {
       name: 'Fall Championship 2024',
       bowlingId: strikeZone.id,
+      teamSize: 4, // Teams of 4 players
     },
   })
 
@@ -104,6 +105,7 @@ async function main() {
     data: {
       name: 'Winter League 2024',
       bowlingId: luckyLanes.id,
+      teamSize: 3, // Teams of 3 players (different configuration)
     },
   })
 
