@@ -31,8 +31,10 @@ export const createTeamSchema = z.object({
 })
 
 export const updateTeamSchema = z.object({
-  name: z.string().min(1, 'Name is required').max(255, 'Name is too long'),
+  name: z.string().min(1, 'Name is required').max(255, 'Name is too long').optional(),
   laneId: z.number().int().positive().optional().nullable(),
+  groupId: z.number().int().positive().optional().nullable(),
+  playerIds: z.array(z.number().int().positive()).optional(),
 })
 
 // Player validations

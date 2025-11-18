@@ -52,6 +52,33 @@ export async function POST(request: NextRequest) {
 
     // Create team with team players in a transaction
     const team = await prisma.$transaction(async (tx) => {
+      // Check if any player is already in another team in this tournament
+      const existingTeamPlayers = await tx.teamPlayer.findMany({
+        where: {
+          playerId: { in: playerIds },
+          team: {
+            tournamentId: teamData.tournamentId,
+          },
+        },
+        include: {
+          player: true,
+          team: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      })
+
+      if (existingTeamPlayers.length > 0) {
+        const conflictDetails = existingTeamPlayers
+          .map((tp) => `${tp.player.name} is already in team "${tp.team.name}"`)
+          .join(', ')
+        throw new Error(
+          `Cannot create team: ${conflictDetails}. A player can only be in one team per tournament.`
+        )
+      }
+
       // Create the team
       const newTeam = await tx.team.create({
         data: teamData,

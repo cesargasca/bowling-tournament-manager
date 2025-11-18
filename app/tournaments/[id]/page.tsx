@@ -663,8 +663,13 @@ export default function TournamentDetailPage() {
                                 {index + 1}
                               </div>
                             </td>
-                            <td className="py-4 px-6 text-zinc-900 dark:text-zinc-50 font-medium">
-                              {team.teamName}
+                            <td className="py-4 px-6">
+                              <button
+                                onClick={() => router.push(`/teams/${team.teamId}`)}
+                                className="text-zinc-900 dark:text-zinc-50 font-medium hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-left"
+                              >
+                                {team.teamName}
+                              </button>
                             </td>
                             {managementMode && (
                               <td className="py-4 px-6">
