@@ -8,6 +8,7 @@ interface TournamentDetails {
     id: number;
     name: string;
     bowlingAlley: string;
+    teamSize: number;
     teamsCount: number;
     sessionsCount: number;
     playersCount: number;
@@ -79,6 +80,12 @@ export default function TournamentDetailPage() {
   const [newCategoryMin, setNewCategoryMin] = useState('');
   const [newCategoryMax, setNewCategoryMax] = useState('');
 
+  // Team creation states
+  const [newTeamName, setNewTeamName] = useState('');
+  const [newTeamPlayerIds, setNewTeamPlayerIds] = useState<number[]>([]);
+  const [allPlayers, setAllPlayers] = useState<any[]>([]);
+  const [creatingTeam, setCreatingTeam] = useState(false);
+
   // Bulk selection states
   const [selectedTeamIds, setSelectedTeamIds] = useState<Set<number>>(new Set());
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<Set<number>>(new Set());
@@ -95,6 +102,12 @@ export default function TournamentDetailPage() {
   useEffect(() => {
     fetchTournamentDetails();
   }, [tournamentId]);
+
+  useEffect(() => {
+    if (managementMode) {
+      fetchAllPlayers();
+    }
+  }, [managementMode]);
 
   const fetchTournamentDetails = async () => {
     try {
@@ -174,6 +187,73 @@ export default function TournamentDetailPage() {
     } catch (err) {
       console.error('Failed to create category:', err);
     }
+  };
+
+  const fetchAllPlayers = async () => {
+    try {
+      const response = await fetch('/api/players');
+      const result = await response.json();
+      if (result.success) {
+        setAllPlayers(result.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch players:', err);
+    }
+  };
+
+  const createTeam = async () => {
+    if (!newTeamName.trim()) {
+      alert('Please enter a team name');
+      return;
+    }
+
+    if (!data) return;
+
+    if (newTeamPlayerIds.length !== data.tournament.teamSize) {
+      alert(
+        `Please select exactly ${data.tournament.teamSize} player${data.tournament.teamSize !== 1 ? 's' : ''} for this tournament`
+      );
+      return;
+    }
+
+    try {
+      setCreatingTeam(true);
+      const response = await fetch('/api/teams', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newTeamName,
+          tournamentId: parseInt(tournamentId),
+          playerIds: newTeamPlayerIds,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setNewTeamName('');
+        setNewTeamPlayerIds([]);
+        fetchTournamentDetails();
+        alert('Team created successfully!');
+      } else {
+        alert(result.error || 'Failed to create team');
+      }
+    } catch (err) {
+      console.error('Failed to create team:', err);
+      alert('Network error - failed to create team');
+    } finally {
+      setCreatingTeam(false);
+    }
+  };
+
+  const togglePlayerForNewTeam = (playerId: number) => {
+    setNewTeamPlayerIds((prev) => {
+      if (prev.includes(playerId)) {
+        return prev.filter((id) => id !== playerId);
+      } else {
+        return [...prev, playerId];
+      }
+    });
   };
 
   const moveTeamToGroup = async (teamId: number, groupId: number | null) => {
@@ -559,6 +639,92 @@ export default function TournamentDetailPage() {
                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                   >
                     Create Group
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Create New Team */}
+            {managementMode && data && (
+              <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900 rounded-lg p-4">
+                <h3 className="font-semibold text-zinc-900 dark:text-zinc-50 mb-3">
+                  Create New Team
+                  <span className="ml-2 text-sm font-normal text-zinc-600 dark:text-zinc-400">
+                    (Select exactly {data.tournament.teamSize} player{data.tournament.teamSize !== 1 ? 's' : ''})
+                  </span>
+                </h3>
+
+                <div className="space-y-3">
+                  {/* Team Name Input */}
+                  <input
+                    type="text"
+                    value={newTeamName}
+                    onChange={(e) => setNewTeamName(e.target.value)}
+                    placeholder="Team name (e.g., Lightning Strikes)"
+                    className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50"
+                  />
+
+                  {/* Player Selection Counter */}
+                  <div
+                    className={`text-sm font-medium ${
+                      newTeamPlayerIds.length === data.tournament.teamSize
+                        ? 'text-green-600 dark:text-green-400'
+                        : 'text-orange-600 dark:text-orange-400'
+                    }`}
+                  >
+                    {newTeamPlayerIds.length} / {data.tournament.teamSize} player{data.tournament.teamSize !== 1 ? 's' : ''} selected
+                  </div>
+
+                  {/* Available Players */}
+                  {allPlayers.length > 0 && (
+                    <div className="max-h-60 overflow-y-auto space-y-2 p-3 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-300 dark:border-zinc-700">
+                      {(() => {
+                        // Get all player IDs already in teams for this tournament
+                        const playersInTeams = new Set<number>();
+                        data.groupedStandings.forEach((group) => {
+                          group.teams.forEach((team) => {
+                            // This would need to be fetched from team details, but for now we'll allow all
+                            // The API will handle the validation
+                          });
+                        });
+
+                        const availablePlayers = allPlayers;
+
+                        return availablePlayers.length === 0 ? (
+                          <div className="text-center text-zinc-600 dark:text-zinc-400 py-4">
+                            No available players
+                          </div>
+                        ) : (
+                          availablePlayers.map((player: any) => (
+                            <label
+                              key={player.id}
+                              className="flex items-center gap-3 p-2 rounded hover:bg-zinc-50 dark:hover:bg-zinc-800 cursor-pointer"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={newTeamPlayerIds.includes(player.id)}
+                                onChange={() => togglePlayerForNewTeam(player.id)}
+                                className="w-4 h-4 rounded border-zinc-300 dark:border-zinc-600 text-green-600 focus:ring-green-500"
+                              />
+                              <span className="text-zinc-900 dark:text-zinc-50">{player.name}</span>
+                            </label>
+                          ))
+                        );
+                      })()}
+                    </div>
+                  )}
+
+                  {/* Create Button */}
+                  <button
+                    onClick={createTeam}
+                    disabled={
+                      creatingTeam ||
+                      !newTeamName.trim() ||
+                      newTeamPlayerIds.length !== data.tournament.teamSize
+                    }
+                    className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {creatingTeam ? 'Creating Team...' : 'Create Team'}
                   </button>
                 </div>
               </div>
