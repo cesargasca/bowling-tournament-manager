@@ -84,7 +84,7 @@ export async function GET() {
             bowling: true,
           },
         },
-        lane: true,
+        sessionMatchups: true,
       },
     });
 
@@ -181,7 +181,7 @@ export async function GET() {
         tournament: s.tournament.name,
         bowlingAlley: s.tournament.bowling.name,
         sessionDate: s.sessionDate,
-        laneNumber: s.lane?.laneNumber,
+        matchupsCount: s.sessionMatchups.length,
         createdAt: s.createdAt,
       })),
       topPlayers: topPlayers.map((p: any) => ({

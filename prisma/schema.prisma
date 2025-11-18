@@ -37,16 +37,18 @@ model Tournament {
 }
 
 model Team {
-  id           Int              @id @default(autoincrement())
-  tournamentId Int
-  name         String
-  laneId       Int?             // Lane assigned to this team for the tournament
-  groupId      Int?             // Group this team belongs to
-  tournament   Tournament       @relation(fields: [tournamentId], references: [id])
-  group        TournamentGroup? @relation(fields: [groupId], references: [id])
-  teamPlayers  TeamPlayer[]
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
+  id               Int              @id @default(autoincrement())
+  tournamentId     Int
+  name             String
+  laneId           Int?             // Lane assigned to this team for the tournament
+  groupId          Int?             // Group this team belongs to
+  tournament       Tournament       @relation(fields: [tournamentId], references: [id])
+  group            TournamentGroup? @relation(fields: [groupId], references: [id])
+  teamPlayers      TeamPlayer[]
+  matchesAsTeamA   SessionMatchup[] @relation("TeamAMatches")
+  matchesAsTeamB   SessionMatchup[] @relation("TeamBMatches")
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
   @@map("teams")
 }
@@ -80,11 +82,10 @@ model TeamPlayer {
 model Session {
   id                 Int                 @id @default(autoincrement())
   tournamentId       Int
-  laneId             Int
   sessionDate        DateTime
   tournament         Tournament          @relation(fields: [tournamentId], references: [id])
-  lane               Lane                @relation(fields: [laneId], references: [id])
   teamPlayerSessions TeamPlayerSession[]
+  sessionMatchups    SessionMatchup[]
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 
@@ -97,12 +98,29 @@ model Lane {
   opponentLaneId     Int?                @unique
   opponentLane       Lane?               @relation("LaneOpponents", fields: [opponentLaneId], references: [id])
   opposingLane       Lane?               @relation("LaneOpponents")
-  sessions           Session[]
+  sessionMatchups    SessionMatchup[]
   teamPlayerSessions TeamPlayerSession[]
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 
   @@map("lanes")
+}
+
+model SessionMatchup {
+  id        Int      @id @default(autoincrement())
+  sessionId Int
+  laneId    Int      // Which lane this match is on
+  teamAId   Int?     // Team assigned to this lane for this session
+  teamBId   Int?     // Team on opponent lane for this session
+  session   Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  lane      Lane     @relation(fields: [laneId], references: [id])
+  teamA     Team?    @relation("TeamAMatches", fields: [teamAId], references: [id])
+  teamB     Team?    @relation("TeamBMatches", fields: [teamBId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([sessionId, laneId])
+  @@map("session_matchups")
 }
 
 model TeamPlayerSession {

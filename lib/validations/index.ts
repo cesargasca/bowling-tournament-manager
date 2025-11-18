@@ -47,12 +47,24 @@ export const updatePlayerSchema = z.object({
 // Session validations
 export const createSessionSchema = z.object({
   tournamentId: z.number().int().positive('Tournament is required'),
-  laneId: z.number().int().positive('Lane is required'),
   sessionDate: z.string().or(z.date()),
 })
 
 export const updateSessionSchema = z.object({
   sessionDate: z.string().or(z.date()),
+})
+
+// Session matchup validations
+export const createSessionMatchupSchema = z.object({
+  sessionId: z.number().int().positive('Session is required'),
+  laneId: z.number().int().positive('Lane is required'),
+  teamAId: z.number().int().positive().optional().nullable(),
+  teamBId: z.number().int().positive().optional().nullable(),
+})
+
+export const updateSessionMatchupSchema = z.object({
+  teamAId: z.number().int().positive().optional().nullable(),
+  teamBId: z.number().int().positive().optional().nullable(),
 })
 
 // Lane validations
@@ -127,6 +139,8 @@ export type CreatePlayerInput = z.infer<typeof createPlayerSchema>
 export type UpdatePlayerInput = z.infer<typeof updatePlayerSchema>
 export type CreateSessionInput = z.infer<typeof createSessionSchema>
 export type UpdateSessionInput = z.infer<typeof updateSessionSchema>
+export type CreateSessionMatchupInput = z.infer<typeof createSessionMatchupSchema>
+export type UpdateSessionMatchupInput = z.infer<typeof updateSessionMatchupSchema>
 export type CreateLaneInput = z.infer<typeof createLaneSchema>
 export type UpdateLaneInput = z.infer<typeof updateLaneSchema>
 export type ScoreEntryInput = z.infer<typeof scoreEntrySchema>

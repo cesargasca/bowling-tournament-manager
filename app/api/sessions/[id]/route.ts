@@ -13,9 +13,31 @@ export async function GET(
       where: { id: parseInt(id) },
       include: {
         tournament: true,
-        lane: {
+        sessionMatchups: {
           include: {
-            opponentLane: true,
+            lane: {
+              include: {
+                opponentLane: true,
+              },
+            },
+            teamA: {
+              include: {
+                teamPlayers: {
+                  include: {
+                    player: true,
+                  },
+                },
+              },
+            },
+            teamB: {
+              include: {
+                teamPlayers: {
+                  include: {
+                    player: true,
+                  },
+                },
+              },
+            },
           },
         },
         teamPlayerSessions: {

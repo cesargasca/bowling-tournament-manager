@@ -70,7 +70,7 @@ export default function TournamentDetailPage() {
   const [data, setData] = useState<TournamentDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'teams' | 'players'>('teams');
+  const [activeTab, setActiveTab] = useState<'teams' | 'players' | 'sessions'>('teams');
   const [managementMode, setManagementMode] = useState(false);
 
   // Form states for new group/category
@@ -84,6 +84,13 @@ export default function TournamentDetailPage() {
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<Set<number>>(new Set());
   const [bulkGroupId, setBulkGroupId] = useState<string>('');
   const [bulkCategoryId, setBulkCategoryId] = useState<string>('');
+
+  // Sessions tab state
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [teams, setTeams] = useState<any[]>([]);
+  const [lanes, setLanes] = useState<any[]>([]);
+  const [showCreateSessionForm, setShowCreateSessionForm] = useState(false);
+  const [sessionDate, setSessionDate] = useState('');
 
   useEffect(() => {
     fetchTournamentDetails();
@@ -100,6 +107,23 @@ export default function TournamentDetailPage() {
       } else {
         setError(result.error || 'Failed to load tournament details');
       }
+
+      // Also fetch sessions, teams, and lanes for the sessions tab
+      const [sessionsRes, teamsRes, lanesRes] = await Promise.all([
+        fetch(`/api/sessions?tournamentId=${tournamentId}`),
+        fetch(`/api/teams?tournamentId=${tournamentId}`),
+        fetch('/api/lanes')
+      ]);
+
+      const [sessionsResult, teamsResult, lanesResult] = await Promise.all([
+        sessionsRes.json(),
+        teamsRes.json(),
+        lanesRes.json()
+      ]);
+
+      if (sessionsResult.success) setSessions(sessionsResult.data);
+      if (teamsResult.success) setTeams(teamsResult.data);
+      if (lanesResult.success) setLanes(lanesResult.data);
     } catch (err) {
       setError('Network error - failed to fetch tournament details');
       console.error(err);
@@ -309,6 +333,40 @@ export default function TournamentDetailPage() {
     }
   };
 
+  const handleCreateSession = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!sessionDate) {
+      alert('Please select a date');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tournamentId: parseInt(tournamentId),
+          sessionDate: new Date(sessionDate).toISOString(),
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setShowCreateSessionForm(false);
+        setSessionDate('');
+        fetchTournamentDetails();
+        alert('Session created successfully');
+      } else {
+        alert(result.error || 'Failed to create session');
+      }
+    } catch (err) {
+      console.error('Failed to create session:', err);
+      alert('Failed to create session');
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center">
@@ -426,6 +484,16 @@ export default function TournamentDetailPage() {
               }`}
             >
               Player Standings
+            </button>
+            <button
+              onClick={() => setActiveTab('sessions')}
+              className={`pb-4 px-2 font-semibold transition-colors ${
+                activeTab === 'sessions'
+                  ? 'border-b-2 border-blue-600 text-blue-600 dark:text-blue-400'
+                  : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50'
+              }`}
+            >
+              Sessions
             </button>
           </div>
         </div>
@@ -954,6 +1022,105 @@ export default function TournamentDetailPage() {
                 )}
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Sessions Tab */}
+        {activeTab === 'sessions' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
+                Sessions
+              </h2>
+              <button
+                onClick={() => setShowCreateSessionForm(!showCreateSessionForm)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                {showCreateSessionForm ? 'Cancel' : 'Create Session'}
+              </button>
+            </div>
+
+            {/* Create Session Form */}
+            {showCreateSessionForm && (
+              <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6">
+                <h3 className="font-semibold text-zinc-900 dark:text-zinc-50 mb-4">
+                  Create New Session
+                </h3>
+                <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
+                  Create a new session for a game day. After creating the session, you'll be able to assign teams to lanes and enter scores.
+                </p>
+                <form onSubmit={handleCreateSession} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                      Session Date
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={sessionDate}
+                      onChange={(e) => setSessionDate(e.target.value)}
+                      className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50"
+                      required
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Create Session
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {/* Sessions List */}
+            {sessions.length === 0 ? (
+              <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 p-12 text-center">
+                <p className="text-zinc-600 dark:text-zinc-400 text-lg">
+                  No sessions yet. Create your first session to get started.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {sessions.map((session: any) => (
+                  <div
+                    key={session.id}
+                    onClick={() => router.push(`/sessions/${session.id}`)}
+                    className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6 cursor-pointer hover:shadow-lg hover:border-blue-500 dark:hover:border-blue-500 transition-all"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">
+                          {new Date(session.sessionDate).toLocaleDateString('en-US', {
+                            weekday: 'long',
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                          })}
+                        </h3>
+                        <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
+                          {session._count?.sessionMatchups > 0
+                            ? `${session._count.sessionMatchups} match${session._count.sessionMatchups !== 1 ? 'es' : ''} configured`
+                            : 'No matches configured yet'}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm text-zinc-600 dark:text-zinc-400">
+                          {session._count.teamPlayerSessions > 0 ? (
+                            <span className="text-green-600 dark:text-green-400 font-semibold">
+                              Scores Entered
+                            </span>
+                          ) : (
+                            <span className="text-orange-600 dark:text-orange-400 font-semibold">
+                              No Scores
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
