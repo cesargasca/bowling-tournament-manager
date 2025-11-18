@@ -18,7 +18,6 @@ export async function POST(
     // Verify session exists
     const session = await prisma.session.findUnique({
       where: { id: sessionId },
-      include: { lane: true },
     })
 
     if (!session) {
@@ -40,6 +39,33 @@ export async function POST(
           throw new Error(`Team player ${score.teamPlayerId} not found`)
         }
 
+        // Find which matchup this team is in for this session
+        const matchup = await tx.sessionMatchup.findFirst({
+          where: {
+            sessionId,
+            OR: [
+              { teamAId: teamPlayer.teamId },
+              { teamBId: teamPlayer.teamId },
+            ],
+          },
+          include: {
+            lane: {
+              include: {
+                opponentLane: true,
+              },
+            },
+          },
+        })
+
+        if (!matchup) {
+          throw new Error(`No matchup found for team ${teamPlayer.teamId} in session ${sessionId}`)
+        }
+
+        // Determine which lane this player is on
+        const laneId = matchup.teamAId === teamPlayer.teamId
+          ? matchup.laneId
+          : matchup.lane.opponentLane?.id || matchup.laneId
+
         // Upsert team player session
         const teamPlayerSession = await tx.teamPlayerSession.upsert({
           where: {
@@ -51,7 +77,7 @@ export async function POST(
           create: {
             teamPlayerId: score.teamPlayerId,
             sessionId,
-            laneId: session.laneId,
+            laneId,
             line1: score.line1,
             line2: score.line2,
             line3: score.line3,
@@ -60,6 +86,7 @@ export async function POST(
             payment: score.payment,
           },
           update: {
+            laneId,
             line1: score.line1,
             line2: score.line2,
             line3: score.line3,

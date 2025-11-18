@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { successResponse, errorResponse, handleApiError } from '@/lib/utils/api'
 import { calculateSessionResult } from '@/lib/services/scoring'
 
-// GET /api/sessions/[id]/results - Get calculated session results with points
+// GET /api/sessions/[id]/results - Get calculated session results with points for all matchups
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -17,9 +17,15 @@ export async function GET(
       where: { id: sessionId },
       include: {
         tournament: true,
-        lane: {
+        sessionMatchups: {
           include: {
-            opponentLane: true,
+            lane: {
+              include: {
+                opponentLane: true,
+              },
+            },
+            teamA: true,
+            teamB: true,
           },
         },
         teamPlayerSessions: {
@@ -40,66 +46,113 @@ export async function GET(
       return errorResponse('Session not found', 404)
     }
 
-    if (!session.lane.opponentLane) {
-      return errorResponse('Session lane has no opponent lane configured', 400)
+    if (session.sessionMatchups.length === 0) {
+      return errorResponse('No matchups configured for this session', 400)
     }
 
-    // Get team player sessions for both teams
-    const laneId = session.laneId
-    const opponentLaneId = session.lane.opponentLaneId
+    // Calculate results for each matchup
+    const matchupResults = []
 
-    const teamAPlayerSessions = session.teamPlayerSessions.filter(
-      (tps) => tps.laneId === laneId
-    )
-    const teamBPlayerSessions = session.teamPlayerSessions.filter(
-      (tps) => tps.laneId === opponentLaneId
-    )
+    for (const matchup of session.sessionMatchups) {
+      if (!matchup.lane.opponentLane) {
+        continue // Skip matchups without opponent lanes
+      }
 
-    // Check if scores exist
-    if (teamAPlayerSessions.length === 0 || teamBPlayerSessions.length === 0) {
-      return errorResponse('No scores entered for this session yet', 400)
+      if (!matchup.teamA || !matchup.teamB) {
+        continue // Skip matchups without both teams assigned
+      }
+
+      const laneId = matchup.laneId
+      const opponentLaneId = matchup.lane.opponentLane.id
+
+      const teamAPlayerSessions = session.teamPlayerSessions.filter(
+        (tps) => tps.laneId === laneId && tps.teamPlayer.teamId === matchup.teamAId
+      )
+      const teamBPlayerSessions = session.teamPlayerSessions.filter(
+        (tps) => tps.laneId === opponentLaneId && tps.teamPlayer.teamId === matchup.teamBId
+      )
+
+      // Skip if no scores entered for this matchup
+      if (teamAPlayerSessions.length === 0 || teamBPlayerSessions.length === 0) {
+        matchupResults.push({
+          matchupId: matchup.id,
+          laneNumber: matchup.lane.laneNumber,
+          opponentLaneNumber: matchup.lane.opponentLane.laneNumber,
+          teamA: {
+            id: matchup.teamA.id,
+            name: matchup.teamA.name,
+          },
+          teamB: {
+            id: matchup.teamB.id,
+            name: matchup.teamB.name,
+          },
+          hasScores: false,
+          message: 'No scores entered for this matchup yet',
+        })
+        continue
+      }
+
+      // Calculate results for this matchup
+      const results = calculateSessionResult(
+        sessionId,
+        session.sessionDate,
+        matchup.lane.laneNumber,
+        matchup.lane.opponentLane.laneNumber,
+        teamAPlayerSessions as any,
+        teamBPlayerSessions as any
+      )
+
+      matchupResults.push({
+        matchupId: matchup.id,
+        laneNumber: matchup.lane.laneNumber,
+        opponentLaneNumber: matchup.lane.opponentLane.laneNumber,
+        teamA: {
+          id: matchup.teamA.id,
+          name: matchup.teamA.name,
+        },
+        teamB: {
+          id: matchup.teamB.id,
+          name: matchup.teamB.name,
+        },
+        hasScores: true,
+        results,
+        playerScores: {
+          teamA: teamAPlayerSessions.map((tps) => ({
+            playerId: tps.teamPlayer.playerId,
+            playerName: tps.teamPlayer.player.name,
+            line1: tps.line1,
+            line2: tps.line2,
+            line3: tps.line3,
+            handicap: tps.handicap,
+            assistance: tps.assistance,
+            payment: tps.payment,
+            total: tps.line1 + tps.line2 + tps.line3,
+          })),
+          teamB: teamBPlayerSessions.map((tps) => ({
+            playerId: tps.teamPlayer.playerId,
+            playerName: tps.teamPlayer.player.name,
+            line1: tps.line1,
+            line2: tps.line2,
+            line3: tps.line3,
+            handicap: tps.handicap,
+            assistance: tps.assistance,
+            payment: tps.payment,
+            total: tps.line1 + tps.line2 + tps.line3,
+          })),
+        },
+      })
     }
-
-    // Calculate results
-    const results = calculateSessionResult(
-      sessionId,
-      session.sessionDate,
-      session.lane.laneNumber,
-      session.lane.opponentLane.laneNumber,
-      teamAPlayerSessions as any,
-      teamBPlayerSessions as any
-    )
 
     return successResponse({
-      ...results,
+      sessionId,
+      sessionDate: session.sessionDate,
       tournament: {
         id: session.tournament.id,
         name: session.tournament.name,
       },
-      playerScores: {
-        teamA: teamAPlayerSessions.map((tps) => ({
-          playerId: tps.teamPlayer.playerId,
-          playerName: tps.teamPlayer.player.name,
-          line1: tps.line1,
-          line2: tps.line2,
-          line3: tps.line3,
-          handicap: tps.handicap,
-          assistance: tps.assistance,
-          payment: tps.payment,
-          total: tps.line1 + tps.line2 + tps.line3,
-        })),
-        teamB: teamBPlayerSessions.map((tps) => ({
-          playerId: tps.teamPlayer.playerId,
-          playerName: tps.teamPlayer.player.name,
-          line1: tps.line1,
-          line2: tps.line2,
-          line3: tps.line3,
-          handicap: tps.handicap,
-          assistance: tps.assistance,
-          payment: tps.payment,
-          total: tps.line1 + tps.line2 + tps.line3,
-        })),
-      },
+      matchups: matchupResults,
+      totalMatchups: session.sessionMatchups.length,
+      matchupsWithScores: matchupResults.filter((m) => m.hasScores).length,
     })
   } catch (error) {
     return handleApiError(error)
