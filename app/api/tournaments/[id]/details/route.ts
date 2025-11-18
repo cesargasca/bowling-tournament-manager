@@ -229,15 +229,19 @@ export async function GET(
 
             const stats = playerStats.get(playerId)!;
 
-            // Add games (3 lines per session = 3 games)
-            const games = [tps.line1, tps.line2, tps.line3];
-            stats.gamesPlayed += 3;
-            stats.totalPins += tps.line1 + tps.line2 + tps.line3;
+            // Only count if player actually played (not absent with 0,0,0)
+            const totalScore = tps.line1 + tps.line2 + tps.line3;
+            if (totalScore > 0) {
+              // Add games (3 lines per session = 3 games)
+              const games = [tps.line1, tps.line2, tps.line3];
+              stats.gamesPlayed += 3;
+              stats.totalPins += totalScore;
 
-            // Update high/low game
-            for (const game of games) {
-              if (game > stats.highGame) stats.highGame = game;
-              if (game < stats.lowGame) stats.lowGame = game;
+              // Update high/low game
+              for (const game of games) {
+                if (game > stats.highGame) stats.highGame = game;
+                if (game > 0 && game < stats.lowGame) stats.lowGame = game;
+              }
             }
           }
         } catch (error) {

@@ -92,6 +92,7 @@ export async function GET() {
     const playerGames = allSessionScores.reduce((acc, score) => {
       const playerId = score.teamPlayer.playerId;
       const playerName = score.teamPlayer.player.name;
+      const totalScore = (score.line1 || 0) + (score.line2 || 0) + (score.line3 || 0);
 
       if (!acc[playerId]) {
         acc[playerId] = {
@@ -104,8 +105,11 @@ export async function GET() {
         };
       }
 
-      acc[playerId].gamesPlayed += 3; // 3 lines per session
-      acc[playerId].totalPins += (score.line1 || 0) + (score.line2 || 0) + (score.line3 || 0);
+      // Only count games if player actually played (not absent with 0,0,0)
+      if (totalScore > 0) {
+        acc[playerId].gamesPlayed += 3; // 3 lines per session
+        acc[playerId].totalPins += totalScore;
+      }
 
       if (score.payment) {
         acc[playerId].paid += 1;

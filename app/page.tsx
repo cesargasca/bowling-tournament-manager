@@ -318,9 +318,10 @@ export default function AdminDashboard() {
             ) : (
               <div className="space-y-3">
                 {data.topPlayers.slice(0, 5).map((player, index) => (
-                  <div
+                  <button
                     key={player.id}
-                    className="flex items-center justify-between p-3 rounded-lg bg-zinc-50 dark:bg-zinc-800/50"
+                    onClick={() => router.push(`/players/${player.id}`)}
+                    className="flex items-center justify-between p-3 rounded-lg bg-zinc-50 dark:bg-zinc-800/50 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors w-full text-left"
                   >
                     <div className="flex items-center gap-3">
                       <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-600 text-white font-bold text-sm">
@@ -343,7 +344,7 @@ export default function AdminDashboard() {
                         paid
                       </div>
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             )}
