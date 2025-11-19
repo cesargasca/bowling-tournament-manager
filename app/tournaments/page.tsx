@@ -1,0 +1,322 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+
+interface Tournament {
+  id: number;
+  name: string;
+  teamSize: number;
+  bowling: {
+    id: number;
+    name: string;
+  };
+  _count: {
+    teams: number;
+    sessions: number;
+  };
+  createdAt: string;
+}
+
+interface BowlingAlley {
+  id: number;
+  name: string;
+}
+
+export default function TournamentsPage() {
+  const router = useRouter();
+
+  const [tournaments, setTournaments] = useState<Tournament[]>([]);
+  const [bowlingAlleys, setBowlingAlleys] = useState<BowlingAlley[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+
+  // Form states
+  const [newTournamentName, setNewTournamentName] = useState('');
+  const [selectedBowlingId, setSelectedBowlingId] = useState('');
+  const [teamSize, setTeamSize] = useState('4');
+  const [creating, setCreating] = useState(false);
+
+  useEffect(() => {
+    fetchTournaments();
+    fetchBowlingAlleys();
+  }, []);
+
+  const fetchTournaments = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/tournaments');
+      const result = await response.json();
+
+      if (result.success) {
+        setTournaments(result.data);
+      } else {
+        setError(result.error || 'Failed to load tournaments');
+      }
+    } catch (err) {
+      setError('Network error - failed to fetch tournaments');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchBowlingAlleys = async () => {
+    try {
+      const response = await fetch('/api/bowling');
+      const result = await response.json();
+
+      if (result.success) {
+        setBowlingAlleys(result.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch bowling alleys:', err);
+    }
+  };
+
+  const createTournament = async () => {
+    if (!newTournamentName.trim()) {
+      alert('Please enter a tournament name');
+      return;
+    }
+
+    if (!selectedBowlingId) {
+      alert('Please select a bowling alley');
+      return;
+    }
+
+    try {
+      setCreating(true);
+      const response = await fetch('/api/tournaments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newTournamentName,
+          bowlingId: parseInt(selectedBowlingId),
+          teamSize: parseInt(teamSize),
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setNewTournamentName('');
+        setSelectedBowlingId('');
+        setTeamSize('4');
+        setShowCreateForm(false);
+        fetchTournaments();
+      } else {
+        alert(result.error || 'Failed to create tournament');
+      }
+    } catch (err) {
+      console.error('Failed to create tournament:', err);
+      alert('Network error - failed to create tournament');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"></div>
+          <p className="mt-4 text-zinc-600 dark:text-zinc-400">Loading tournaments...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
+      {/* Header */}
+      <div className="bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex justify-between items-start">
+            <div>
+              <button
+                onClick={() => router.push('/')}
+                className="mb-4 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 flex items-center gap-2"
+              >
+                <span>←</span> Back to Dashboard
+              </button>
+              <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-50">Tournaments</h1>
+              <p className="mt-2 text-zinc-600 dark:text-zinc-400">
+                Manage all tournaments in the system
+              </p>
+            </div>
+
+            <button
+              onClick={() => setShowCreateForm(!showCreateForm)}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                showCreateForm
+                  ? 'bg-zinc-600 text-white hover:bg-zinc-700'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+              }`}
+            >
+              {showCreateForm ? 'Cancel' : 'Create Tournament'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Error Message */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+            <p className="text-red-800 dark:text-red-200">{error}</p>
+          </div>
+        )}
+
+        {/* Create Tournament Form */}
+        {showCreateForm && (
+          <div className="mb-6 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg p-6">
+            <h3 className="font-semibold text-zinc-900 dark:text-zinc-50 mb-4">Create New Tournament</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                  Tournament Name
+                </label>
+                <input
+                  type="text"
+                  value={newTournamentName}
+                  onChange={(e) => setNewTournamentName(e.target.value)}
+                  placeholder="e.g., Fall Championship 2024"
+                  className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50"
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                  Bowling Alley
+                </label>
+                <select
+                  value={selectedBowlingId}
+                  onChange={(e) => setSelectedBowlingId(e.target.value)}
+                  className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50"
+                >
+                  <option value="">Select a bowling alley...</option>
+                  {bowlingAlleys.map((alley) => (
+                    <option key={alley.id} value={alley.id}>
+                      {alley.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                  Team Size (players per team)
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="10"
+                  value={teamSize}
+                  onChange={(e) => setTeamSize(e.target.value)}
+                  className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50"
+                />
+                <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">
+                  Each team in this tournament will require exactly {teamSize} player{teamSize !== '1' ? 's' : ''}
+                </p>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={createTournament}
+                  disabled={creating || !newTournamentName.trim() || !selectedBowlingId}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {creating ? 'Creating...' : 'Create Tournament'}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowCreateForm(false);
+                    setNewTournamentName('');
+                    setSelectedBowlingId('');
+                    setTeamSize('4');
+                  }}
+                  disabled={creating}
+                  className="px-6 py-2 bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-50 rounded-lg hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tournaments List */}
+        <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+          <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">All Tournaments</h2>
+              <span className="text-sm text-zinc-600 dark:text-zinc-400">
+                {tournaments.length} tournament{tournaments.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+          </div>
+
+          {tournaments.length === 0 ? (
+            <div className="p-12 text-center">
+              <p className="text-zinc-600 dark:text-zinc-400 text-lg">No tournaments yet</p>
+              {!showCreateForm && (
+                <button
+                  onClick={() => setShowCreateForm(true)}
+                  className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Create First Tournament
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
+              {tournaments.map((tournament) => (
+                <div
+                  key={tournament.id}
+                  className="px-6 py-4 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <button
+                        onClick={() => router.push(`/tournaments/${tournament.id}`)}
+                        className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-left"
+                      >
+                        {tournament.name}
+                      </button>
+                      <div className="mt-1 flex items-center gap-4 text-sm text-zinc-600 dark:text-zinc-400">
+                        <span>🎯 {tournament.bowling.name}</span>
+                        <span>👥 {tournament.teamSize} players per team</span>
+                        <span>🎳 {tournament._count.teams} teams</span>
+                        <span>📅 {tournament._count.sessions} sessions</span>
+                        <span>
+                          Added {new Date(tournament.createdAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => router.push(`/tournaments/${tournament.id}/edit`)}
+                        className="px-3 py-1 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => router.push(`/tournaments/${tournament.id}`)}
+                        className="px-3 py-1 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50 transition-colors"
+                      >
+                        View Details →
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

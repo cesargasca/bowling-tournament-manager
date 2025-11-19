@@ -26,7 +26,23 @@ export async function GET(
         sessions: {
           orderBy: { sessionDate: 'asc' },
           include: {
-            lane: true,
+            sessionMatchups: {
+              include: {
+                lane: {
+                  include: {
+                    opponentLane: true,
+                  },
+                },
+                teamA: true,
+                teamB: true,
+              },
+            },
+          },
+        },
+        _count: {
+          select: {
+            teams: true,
+            sessions: true,
           },
         },
       },
