@@ -40,7 +40,7 @@ export default function CreateTournamentPage() {
 
   const fetchBowlingAlleys = async () => {
     try {
-      const response = await fetch('/api/bowling');
+      const response = await fetch('/api/bowling-alleys');
       const result = await response.json();
 
       if (result.success) {
