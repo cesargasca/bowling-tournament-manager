@@ -248,12 +248,20 @@ export default function AdminDashboard() {
 
         {/* Tournaments */}
         <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6 mb-8">
-          <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50 mb-4">
-            Active Tournaments
-            <span className="text-sm font-normal text-zinc-600 dark:text-zinc-400 ml-2">
-              (click to view details)
-            </span>
-          </h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
+              Active Tournaments
+              <span className="text-sm font-normal text-zinc-600 dark:text-zinc-400 ml-2">
+                (click to view details)
+              </span>
+            </h2>
+            <button
+              onClick={() => router.push('/tournaments/create')}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            >
+              Create Tournament
+            </button>
+          </div>
           {data.tournaments.length === 0 ? (
             <p className="text-zinc-600 dark:text-zinc-400">No tournaments found</p>
           ) : (
