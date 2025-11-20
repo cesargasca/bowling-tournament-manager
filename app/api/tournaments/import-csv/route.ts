@@ -122,9 +122,15 @@ export async function POST(request: NextRequest) {
       // Process categories
       const uniqueCategories = new Set<string>()
       for (const [, data] of teamMap.entries()) {
+        // Check both regular players and substitutes for categories
         for (const player of data.players) {
           if (player.category) {
             uniqueCategories.add(player.category)
+          }
+        }
+        for (const substitute of data.substitutes) {
+          if (substitute.category) {
+            uniqueCategories.add(substitute.category)
           }
         }
       }
@@ -168,9 +174,9 @@ export async function POST(request: NextRequest) {
           const playerName = playerData.playerName.trim()
           const email = playerData.email?.trim() || null
           const phone = playerData.phone?.trim() || null
-          const handicap = playerData.handicap
-            ? parseInt(playerData.handicap)
-            : 0
+          // Parse handicap, defaulting to 0 if not a valid number
+          const parsedHandicap = playerData.handicap ? parseInt(playerData.handicap) : 0
+          const handicap = isNaN(parsedHandicap) ? 0 : parsedHandicap
 
           // Check if player exists by name
           let player = await tx.player.findFirst({
