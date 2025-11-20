@@ -13,42 +13,46 @@ interface CSVRow {
   substitute?: string
 }
 
-// POST /api/tournaments/import-csv - Import teams and players from CSV
+// POST /api/tournaments/import-csv - Import teams and players from CSV (optionally creating tournament)
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { tournamentId, csvData } = body
-
-    if (!tournamentId) {
-      return errorResponse('Tournament ID is required', 400)
-    }
+    const { tournamentId, tournamentName, bowlingId, teamSize, substituteCount, csvData } = body
 
     if (!csvData || !Array.isArray(csvData) || csvData.length === 0) {
       return errorResponse('CSV data is required', 400)
     }
 
-    // Verify tournament exists
-    const tournament = await prisma.tournament.findUnique({
-      where: { id: parseInt(tournamentId) },
-      include: {
-        _count: {
-          select: {
-            teams: true,
+    // If tournament details are provided, create tournament in the same transaction
+    const createTournament = !tournamentId && tournamentName && bowlingId
+
+    let tournament
+    if (tournamentId) {
+      // Verify tournament exists
+      tournament = await prisma.tournament.findUnique({
+        where: { id: parseInt(tournamentId) },
+        include: {
+          _count: {
+            select: {
+              teams: true,
+            },
           },
         },
-      },
-    })
+      })
 
-    if (!tournament) {
-      return errorResponse('Tournament not found', 404)
-    }
+      if (!tournament) {
+        return errorResponse('Tournament not found', 404)
+      }
 
-    // Check if tournament already has teams
-    if (tournament._count.teams > 0) {
-      return errorResponse(
-        'Tournament already has teams. CSV import is only available during tournament creation.',
-        400
-      )
+      // Check if tournament already has teams
+      if (tournament._count.teams > 0) {
+        return errorResponse(
+          'Tournament already has teams. CSV import is only available during tournament creation.',
+          400
+        )
+      }
+    } else if (!createTournament) {
+      return errorResponse('Either tournamentId or tournament details (name, bowlingId) are required', 400)
     }
 
     // Helper function to check if player is a substitute
@@ -80,6 +84,21 @@ export async function POST(request: NextRequest) {
 
     // Process the import in a transaction
     const result = await prisma.$transaction(async (tx) => {
+      let finalTournamentId = tournamentId ? parseInt(tournamentId) : null
+
+      // Create tournament if needed
+      if (createTournament) {
+        const newTournament = await tx.tournament.create({
+          data: {
+            name: tournamentName,
+            bowlingId: parseInt(bowlingId),
+            teamSize: teamSize ? parseInt(teamSize) : 4,
+            substituteCount: substituteCount !== undefined ? parseInt(substituteCount) : 0,
+          },
+        })
+        finalTournamentId = newTournament.id
+      }
+
       const createdTeams: any[] = []
       const createdPlayers: any[] = []
       const existingPlayers: any[] = []
@@ -101,7 +120,7 @@ export async function POST(request: NextRequest) {
       for (const groupName of uniqueGroups) {
         let group = await tx.tournamentGroup.findFirst({
           where: {
-            tournamentId: parseInt(tournamentId),
+            tournamentId: finalTournamentId!,
             name: groupName,
           },
         })
@@ -109,7 +128,7 @@ export async function POST(request: NextRequest) {
         if (!group) {
           group = await tx.tournamentGroup.create({
             data: {
-              tournamentId: parseInt(tournamentId),
+              tournamentId: finalTournamentId!,
               name: groupName,
             },
           })
@@ -138,7 +157,7 @@ export async function POST(request: NextRequest) {
       for (const categoryName of uniqueCategories) {
         let category = await tx.playerCategory.findFirst({
           where: {
-            tournamentId: parseInt(tournamentId),
+            tournamentId: finalTournamentId!,
             name: categoryName,
           },
         })
@@ -146,7 +165,7 @@ export async function POST(request: NextRequest) {
         if (!category) {
           category = await tx.playerCategory.create({
             data: {
-              tournamentId: parseInt(tournamentId),
+              tournamentId: finalTournamentId!,
               name: categoryName,
             },
           })
@@ -162,7 +181,7 @@ export async function POST(request: NextRequest) {
         const team = await tx.team.create({
           data: {
             name: teamName,
-            tournamentId: parseInt(tournamentId),
+            tournamentId: finalTournamentId!,
             groupId: data.group ? groupCache.get(data.group) : null,
           },
         })
@@ -228,7 +247,7 @@ export async function POST(request: NextRequest) {
               where: {
                 playerId_tournamentId: {
                   playerId: player.id,
-                  tournamentId: parseInt(tournamentId),
+                  tournamentId: finalTournamentId!,
                 },
               },
             })
@@ -237,7 +256,7 @@ export async function POST(request: NextRequest) {
               await tx.playerTournamentCategory.create({
                 data: {
                   playerId: player.id,
-                  tournamentId: parseInt(tournamentId),
+                  tournamentId: finalTournamentId!,
                   categoryId,
                   isManual: true,
                 },
@@ -258,6 +277,7 @@ export async function POST(request: NextRequest) {
       }
 
       return {
+        tournamentId: finalTournamentId,
         teamsCreated: createdTeams.length,
         playersCreated: createdPlayers.length,
         playersReused: existingPlayers.length,
@@ -269,7 +289,7 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    return successResponse(result, 'CSV imported successfully')
+    return successResponse(result, createTournament ? 'Tournament created and CSV imported successfully' : 'CSV imported successfully')
   } catch (error) {
     console.error('CSV import error:', error)
     return handleApiError(error)

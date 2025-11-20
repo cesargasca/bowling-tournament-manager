@@ -164,57 +164,56 @@ export default function CreateTournamentPage() {
       return;
     }
 
-    if (csvData.length === 0) {
-      setError('Please upload a CSV file with teams and players');
-      return;
-    }
-
     setLoading(true);
     setError(null);
 
     try {
-      // Step 1: Create tournament
-      const tournamentResponse = await fetch('/api/tournaments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: tournamentName,
-          bowlingId: parseInt(selectedBowlingId),
-          teamSize: parseInt(teamSize),
-          substituteCount: parseInt(substituteCount),
-        }),
-      });
+      // If CSV data is provided, import as part of tournament creation
+      if (csvData.length > 0) {
+        const response = await fetch('/api/tournaments/import-csv', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tournamentName,
+            bowlingId: parseInt(selectedBowlingId),
+            teamSize: parseInt(teamSize),
+            substituteCount: parseInt(substituteCount),
+            csvData,
+          }),
+        });
 
-      const tournamentResult = await tournamentResponse.json();
+        const result = await response.json();
 
-      if (!tournamentResult.success) {
-        throw new Error(tournamentResult.error || 'Failed to create tournament');
+        if (!result.success) {
+          setError(result.error || 'Failed to create tournament with CSV import');
+          return;
+        }
+
+        // Success - redirect to tournament
+        router.push(`/tournaments/${result.data.tournamentId}`);
+      } else {
+        // Create tournament without CSV import
+        const response = await fetch('/api/tournaments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: tournamentName,
+            bowlingId: parseInt(selectedBowlingId),
+            teamSize: parseInt(teamSize),
+            substituteCount: parseInt(substituteCount),
+          }),
+        });
+
+        const result = await response.json();
+
+        if (!result.success) {
+          setError(result.error || 'Failed to create tournament');
+          return;
+        }
+
+        // Success - redirect to tournament
+        router.push(`/tournaments/${result.data.id}`);
       }
-
-      const tournamentId = tournamentResult.data.id;
-
-      // Step 2: Import CSV
-      const importResponse = await fetch('/api/tournaments/import-csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tournamentId,
-          csvData,
-        }),
-      });
-
-      const importResult = await importResponse.json();
-
-      if (!importResult.success) {
-        // Tournament was created but import failed
-        setError(
-          `Tournament created but CSV import failed: ${importResult.error}. You can manually add teams by visiting the tournament page or try importing again.`
-        );
-        return;
-      }
-
-      // Success!
-      router.push(`/tournaments/${tournamentId}`);
     } catch (err: any) {
       setError(err.message || 'Failed to create tournament');
     } finally {
@@ -362,26 +361,25 @@ export default function CreateTournamentPage() {
             </div>
           </div>
 
-          {/* CSV Import (Required) */}
+          {/* CSV Import (Optional) */}
           <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6">
             <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50 mb-2">
-              Import Teams and Players *
+              Import Teams and Players (Optional)
             </h2>
             <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-6">
-              Upload a CSV file with your teams and players. Players must be assigned to teams.
+              Upload a CSV file to create teams and players all at once, or skip this step and add them manually later.
             </p>
 
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-                  CSV File *
+                  CSV File
                 </label>
                 <input
                   type="file"
                   accept=".csv"
                   onChange={handleFileChange}
                   className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50"
-                  required
                 />
                 <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-500">
                   Required columns: Team Name, Player Name<br />
@@ -455,10 +453,10 @@ Team 3,Group B,Max Extra,,,18,B League,Yes`}
             </button>
             <button
               type="submit"
-              disabled={loading || !tournamentName.trim() || !selectedBowlingId || csvData.length === 0}
+              disabled={loading || !tournamentName.trim() || !selectedBowlingId}
               className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Creating Tournament...' : 'Create Tournament'}
+              {loading ? 'Creating Tournament...' : (csvData.length > 0 ? 'Create Tournament & Import CSV' : 'Create Tournament')}
             </button>
           </div>
         </form>
