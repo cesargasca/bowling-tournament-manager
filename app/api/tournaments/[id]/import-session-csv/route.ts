@@ -16,8 +16,11 @@ interface ParsedCSVData {
 /**
  * Parse session CSV data
  * Expected format:
- * Session,Date,Lane17,Lane18,Lane19,...,Lane34
+ * Session,Date,Lane1,Lane2,Lane3,...
  * 1a,Nov 11,TEAM1,TEAM2,TEAM3,...
+ *
+ * The parser dynamically detects lane columns from CSV headers.
+ * Lane columns must follow the pattern: Lane{number} (e.g., Lane1, Lane17, Lane25)
  */
 function parseSessionCSV(csvContent: string): ParsedCSVData {
   const records = parse(csvContent, {
@@ -25,6 +28,27 @@ function parseSessionCSV(csvContent: string): ParsedCSVData {
     skip_empty_lines: true,
     trim: true,
   })
+
+  if (records.length === 0) {
+    throw new Error('CSV file contains no data rows')
+  }
+
+  // Extract lane columns from first record (header keys)
+  const firstRecord = records[0]
+  const lanePattern = /^Lane(\d+)$/i
+  const laneColumns: Array<{ key: string; laneNumber: number }> = []
+
+  for (const key of Object.keys(firstRecord)) {
+    const match = key.match(lanePattern)
+    if (match) {
+      const laneNumber = parseInt(match[1], 10)
+      laneColumns.push({ key, laneNumber })
+    }
+  }
+
+  if (laneColumns.length === 0) {
+    throw new Error('No lane columns found in CSV. Lane columns must be named like: Lane1, Lane2, Lane17, etc.')
+  }
 
   const sessions: SessionRow[] = []
 
@@ -38,13 +62,12 @@ function parseSessionCSV(csvContent: string): ParsedCSVData {
 
     const laneAssignments: Record<string, string> = {}
 
-    // Extract lane assignments (Lane17 through Lane34)
-    for (let laneNum = 17; laneNum <= 34; laneNum++) {
-      const laneKey = `Lane${laneNum}`
-      const teamName = record[laneKey]
+    // Extract lane assignments dynamically based on detected columns
+    for (const { key, laneNumber } of laneColumns) {
+      const teamName = record[key]
 
       if (teamName && teamName.trim()) {
-        laneAssignments[laneNum.toString()] = teamName.trim()
+        laneAssignments[laneNumber.toString()] = teamName.trim()
       }
     }
 

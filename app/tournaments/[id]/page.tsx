@@ -102,6 +102,13 @@ export default function TournamentDetailPage() {
   const [showCreateSessionForm, setShowCreateSessionForm] = useState(false);
   const [sessionDate, setSessionDate] = useState('');
 
+  // CSV import state
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [csvYear, setCsvYear] = useState('');
+  const [uploadingCsv, setUploadingCsv] = useState(false);
+  const [csvError, setCsvError] = useState<string | null>(null);
+  const [csvSuccess, setCsvSuccess] = useState<string | null>(null);
+
   useEffect(() => {
     fetchTournamentDetails();
   }, [tournamentId]);
@@ -459,6 +466,53 @@ export default function TournamentDetailPage() {
     } catch (err) {
       console.error('Failed to create session:', err);
       alert('Failed to create session');
+    }
+  };
+
+  const handleCsvUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!csvFile) {
+      setCsvError('Please select a CSV file');
+      return;
+    }
+
+    setCsvError(null);
+    setCsvSuccess(null);
+    setUploadingCsv(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', csvFile);
+      if (csvYear) {
+        formData.append('year', csvYear);
+      }
+
+      const response = await fetch(`/api/tournaments/${tournamentId}/import-session-csv`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setCsvSuccess(result.data.message);
+        setCsvFile(null);
+        setCsvYear('');
+        fetchTournamentDetails();
+
+        // Show detailed results if there are errors
+        if (result.data.errors && result.data.errors.length > 0) {
+          console.warn('CSV import warnings:', result.data.errors);
+        }
+      } else {
+        setCsvError(result.error || 'Failed to import CSV');
+      }
+    } catch (err) {
+      console.error('Failed to upload CSV:', err);
+      setCsvError('Failed to upload CSV file');
+    } finally {
+      setUploadingCsv(false);
     }
   };
 
@@ -1275,10 +1329,91 @@ export default function TournamentDetailPage() {
 
             {/* Sessions List */}
             {sessions.length === 0 ? (
-              <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 p-12 text-center">
-                <p className="text-zinc-600 dark:text-zinc-400 text-lg">
-                  No sessions yet. Create your first session to get started.
-                </p>
+              <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 p-8">
+                <div className="text-center mb-8">
+                  <p className="text-zinc-600 dark:text-zinc-400 text-lg mb-2">
+                    No sessions yet. Create sessions individually or import a schedule from CSV.
+                  </p>
+                </div>
+
+                {/* CSV Import Section */}
+                <div className="border-t border-zinc-200 dark:border-zinc-800 pt-8">
+                  <h3 className="font-semibold text-zinc-900 dark:text-zinc-50 mb-4 text-center">
+                    Import Session Schedule from CSV
+                  </h3>
+                  <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-6 text-center max-w-2xl mx-auto">
+                    Upload a CSV file with your complete tournament schedule. The file should include session dates and team assignments for each lane.
+                    Download the <a href="/session-import-template.csv" className="text-blue-600 hover:underline">template file</a> to see the required format.
+                  </p>
+
+                  {csvError && (
+                    <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                      <p className="text-red-800 dark:text-red-200 text-sm">{csvError}</p>
+                    </div>
+                  )}
+
+                  {csvSuccess && (
+                    <div className="mb-4 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                      <p className="text-green-800 dark:text-green-200 text-sm">{csvSuccess}</p>
+                    </div>
+                  )}
+
+                  <form onSubmit={handleCsvUpload} className="space-y-6 max-w-xl mx-auto">
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                        CSV File
+                      </label>
+                      <input
+                        type="file"
+                        accept=".csv"
+                        onChange={(e) => setCsvFile(e.target.files?.[0] || null)}
+                        className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-blue-900/20 dark:file:text-blue-400"
+                        required
+                        disabled={uploadingCsv}
+                      />
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                        CSV format: Session,Date,Lane1,Lane2,Lane3,... (Lane numbers match your bowling alley configuration)
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                        Year (optional)
+                      </label>
+                      <input
+                        type="number"
+                        value={csvYear}
+                        onChange={(e) => setCsvYear(e.target.value)}
+                        placeholder={new Date().getFullYear().toString()}
+                        min="2000"
+                        max="2100"
+                        className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50"
+                        disabled={uploadingCsv}
+                      />
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                        Specify the year for date parsing. Defaults to current year if not provided.
+                      </p>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={uploadingCsv || !csvFile}
+                      className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+                    >
+                      {uploadingCsv ? (
+                        <span className="flex items-center justify-center">
+                          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Importing...
+                        </span>
+                      ) : (
+                        'Import Schedule'
+                      )}
+                    </button>
+                  </form>
+                </div>
               </div>
             ) : (
               <div className="space-y-4">

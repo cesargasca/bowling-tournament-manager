@@ -7,27 +7,54 @@ This feature allows you to import tournament session schedules from a CSV file, 
 The CSV file must have the following structure:
 
 ```csv
+Session,Date,Lane1,Lane2,Lane3,Lane4,...
+1a,Nov 11,TEAM1,TEAM2,TEAM3,TEAM4,...
+2a,Nov 18,TEAM5,TEAM6,TEAM7,TEAM8,...
+```
+
+**The lane numbers in your CSV should match your bowling alley's lane configuration.** The parser automatically detects lane columns, so you can use any lane numbering scheme.
+
+### Examples for Different Lane Configurations:
+
+**Standard bowling alley (lanes 1-20):**
+```csv
+Session,Date,Lane1,Lane2,Lane3,Lane4,...,Lane20
+1a,Nov 11,TEAM1,TEAM2,TEAM3,TEAM4,...,TEAM20
+```
+
+**Bol Insurgentes (lanes 17-34):**
+```csv
 Session,Date,Lane17,Lane18,Lane19,Lane20,...,Lane34
 1a,Nov 11,TEAM1,TEAM2,TEAM3,TEAM4,...,TEAM18
-2a,Nov 18,TEAM5,TEAM6,TEAM7,TEAM8,...,TEAM19
+```
+
+**Custom configuration (lanes 5-14):**
+```csv
+Session,Date,Lane5,Lane6,Lane7,Lane8,...,Lane14
+1a,Nov 11,TEAM1,TEAM2,TEAM3,TEAM4,...,TEAM10
 ```
 
 ### Columns:
 
 1. **Session**: Session identifier (e.g., "1a", "2a", "3a")
 2. **Date**: Session date in format "Month Day" (e.g., "Nov 11", "Jan 20")
-3. **Lane17 through Lane34**: Team names assigned to each lane (18 lanes total)
+3. **Lane{N}**: Team names assigned to each lane. Column names must follow the pattern `Lane{number}` (e.g., Lane1, Lane17, Lane25)
 
 ### Requirements:
 
 - **Teams must already exist** in the tournament before importing sessions
 - Team names in the CSV must match exactly (case-insensitive) with team names in the database
-- Lanes 17-34 must be configured in the database with opponent pairings
+- **Lane columns are detected automatically** - use whatever lane numbers match your bowling alley
+- Lanes must be configured in the database with opponent pairings (see Lane Configuration section below)
 - Dates can span multiple years (tournament year context is used)
 
-## Lane Pairing
+## Lane Configuration
 
-Teams are automatically matched based on opponent lane configuration:
+### Lane Pairing
+
+Teams are automatically matched based on opponent lane configuration in your database. Each lane must have an opponent lane configured for proper matchup creation.
+
+**Example: Bol Insurgentes (lanes 17-34):**
 - Lane 17 ↔ Lane 18
 - Lane 19 ↔ Lane 20
 - Lane 21 ↔ Lane 22
@@ -38,7 +65,33 @@ Teams are automatically matched based on opponent lane configuration:
 - Lane 31 ↔ Lane 32
 - Lane 33 ↔ Lane 34
 
-## API Endpoint
+**Example: Standard alley (lanes 1-10):**
+- Lane 1 ↔ Lane 2
+- Lane 3 ↔ Lane 4
+- Lane 5 ↔ Lane 6
+- Lane 7 ↔ Lane 8
+- Lane 9 ↔ Lane 10
+
+### Setting Up Lane Pairs
+
+Before importing session schedules, ensure your lanes are configured with opponent pairings in the database. Lanes are typically paired in odd-even pairs (1-2, 3-4, 5-6, etc.) but can be configured differently based on your bowling alley's layout.
+
+When you create a bowling alley in the system, you can specify the lane range (start and end lane numbers), and the system will automatically create pairs.
+
+## How to Import Sessions
+
+### Using the Web Interface (Recommended)
+
+1. Navigate to your tournament page
+2. Click on the **Sessions** tab
+3. If no sessions exist, you'll see a CSV import form
+4. Click "Choose File" and select your CSV file
+5. Optionally enter the year for date parsing
+6. Click "Import Schedule"
+
+The interface will show success messages and any errors or warnings from the import process.
+
+### Using the API Directly
 
 **POST** `/api/tournaments/{tournamentId}/import-session-csv`
 
@@ -122,14 +175,16 @@ You can download this template and modify it with your tournament's schedule.
 
 ## Important Notes
 
-1. **Team Names**: Must match exactly (case-insensitive) with teams in the database
-2. **Date Format**: Supports abbreviated and full month names (e.g., "Nov" or "November")
-3. **Year Handling**:
+1. **Flexible Lane Configuration**: The CSV parser automatically detects lane columns from your CSV headers. Use whatever lane numbering matches your bowling alley (lanes 1-20, 17-34, 5-14, etc.)
+2. **Team Names**: Must match exactly (case-insensitive) with teams in the database
+3. **Date Format**: Supports abbreviated and full month names (e.g., "Nov" or "November")
+4. **Year Handling**:
    - If sessions span multiple years (e.g., Nov-Feb), provide the starting year
    - Dates will automatically roll over to the next year when appropriate
-4. **Empty Lanes**: Lanes can be left empty (BYE) if a team has no opponent
-5. **Transaction Safety**: All sessions are created in a single database transaction
-6. **Error Handling**: Partial failures are reported but don't stop the entire import
+5. **Empty Lanes**: Lanes can be left empty (BYE) if a team has no opponent
+6. **Transaction Safety**: All sessions are created in a single database transaction
+7. **Error Handling**: Partial failures are reported but don't stop the entire import
+8. **Lane Column Format**: Lane columns must be named exactly as `Lane{number}` (e.g., Lane1, Lane17, Lane25). Case-insensitive.
 
 ## Workflow
 
@@ -148,14 +203,20 @@ See the complete example in `/public/session-import-template.csv` which includes
 
 ## Troubleshooting
 
+### "No lane columns found in CSV" error
+- Ensure your CSV has columns named like `Lane1`, `Lane2`, `Lane17`, etc.
+- Lane column names must follow the pattern: `Lane{number}`
+- Check that column names don't have extra spaces or typos
+
 ### "Team not found" errors
 - Verify team names in CSV match database exactly
 - Check for extra spaces or special characters
 - Team names are case-insensitive but must match otherwise
 
 ### "Lane not found" errors
-- Ensure lanes 17-34 are created in the database
-- Run database migrations and seed if needed
+- Ensure the lanes referenced in your CSV exist in the database
+- Verify your bowling alley has lanes configured with the correct numbers
+- Check that lane numbers in CSV match your bowling alley's configuration
 
 ### "Invalid date format" errors
 - Use format "Month Day" (e.g., "Nov 11", "January 20")
@@ -163,4 +224,10 @@ See the complete example in `/public/session-import-template.csv` which includes
 
 ### "No opponent lane configured" errors
 - Verify lane opponent relationships are set up correctly
-- Re-run database seed to create proper lane pairings
+- Each lane must have an opponent lane configured in the database
+- When creating a bowling alley, ensure lanes are created in pairs
+
+### Sessions imported but matchups are missing
+- Check that your lanes have opponent pairings configured
+- Verify team names in CSV exactly match team names in database
+- Review the response for any error messages or warnings
