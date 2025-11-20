@@ -2,45 +2,18 @@ import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
-// Helper function to generate realistic bowling scores
-function generateBowlingScore(skillLevel: 'beginner' | 'intermediate' | 'advanced' | 'absent') {
-  if (skillLevel === 'absent') {
-    return { line1: 0, line2: 0, line3: 0, handicap: 0 }
-  }
-
-  const baseScores = {
-    beginner: { min: 80, max: 140, avgHandicap: 35 },
-    intermediate: { min: 120, max: 180, avgHandicap: 20 },
-    advanced: { min: 160, max: 220, avgHandicap: 5 },
-  }
-
-  const base = baseScores[skillLevel]
-  const variance = 25 // Additional variance per game
-
-  const line1 = Math.floor(Math.random() * (base.max - base.min + variance)) + base.min - variance / 2
-  const line2 = Math.floor(Math.random() * (base.max - base.min + variance)) + base.min - variance / 2
-  const line3 = Math.floor(Math.random() * (base.max - base.min + variance)) + base.min - variance / 2
-
-  // Clamp scores between 0 and 300
-  const clamp = (val: number) => Math.max(0, Math.min(300, val))
-
-  return {
-    line1: clamp(line1),
-    line2: clamp(line2),
-    line3: clamp(line3),
-    handicap: Math.floor(Math.random() * 15) + (base.avgHandicap - 7), // ±7 variance
-  }
-}
-
 async function main() {
   console.log('Starting seed...')
 
   // Clean existing data
+  await prisma.playerTournamentCategory.deleteMany()
   await prisma.sessionMatchup.deleteMany()
   await prisma.teamPlayerSession.deleteMany()
   await prisma.session.deleteMany()
   await prisma.teamPlayer.deleteMany()
   await prisma.team.deleteMany()
+  await prisma.tournamentGroup.deleteMany()
+  await prisma.playerCategory.deleteMany()
   await prisma.player.deleteMany()
   await prisma.lane.deleteMany()
   await prisma.tournament.deleteMany()
@@ -48,42 +21,18 @@ async function main() {
 
   console.log('Cleaned existing data')
 
-  // Create bowling alleys
-  const strikeZone = await prisma.bowling.create({
+  // Create Bol Insurgentes bowling alley
+  const bolInsurgentes = await prisma.bowling.create({
     data: {
-      name: 'Strike Zone Bowling',
+      name: 'Bol Insurgentes',
     },
   })
 
-  const luckyLanes = await prisma.bowling.create({
-    data: {
-      name: 'Lucky Lanes',
-    },
-  })
+  console.log('Created bowling alley: Bol Insurgentes')
 
-  const pinPalace = await prisma.bowling.create({
-    data: {
-      name: 'Pin Palace',
-    },
-  })
-
-  const spareTime = await prisma.bowling.create({
-    data: {
-      name: 'Spare Time Bowl',
-    },
-  })
-
-  const galaxyBowl = await prisma.bowling.create({
-    data: {
-      name: 'Galaxy Bowling Center',
-    },
-  })
-
-  console.log('Created 5 bowling alleys')
-
-  // Create lanes for Strike Zone (18 lanes with opponent pairs)
+  // Create lanes 17-34 with opponent pairs
   const lanes = []
-  for (let i = 1; i <= 18; i += 2) {
+  for (let i = 17; i <= 34; i += 2) {
     // Create lane i
     const lane1 = await prisma.lane.create({
       data: {
@@ -108,210 +57,243 @@ async function main() {
     lanes.push(lane1, lane2)
   }
 
-  console.log('Created 18 lanes with opponent pairings')
+  console.log('Created lanes 17-34 with opponent pairings (9 pairs, 18 total lanes)')
 
-  // Create tournaments
-  const fallTournament = await prisma.tournament.create({
+  // Create Super Bowl tournament
+  const superBowl = await prisma.tournament.create({
     data: {
-      name: 'Fall Championship 2024',
-      bowlingId: strikeZone.id,
-      teamSize: 4, // Teams of 4 players
+      name: 'Super Bowl',
+      bowlingId: bolInsurgentes.id,
+      teamSize: 4,
+      substituteCount: 0,
     },
   })
 
-  const winterTournament = await prisma.tournament.create({
+  console.log('Created tournament: Super Bowl')
+
+  // Create groups
+  const groupPrimera = await prisma.tournamentGroup.create({
     data: {
-      name: 'Winter League 2024',
-      bowlingId: luckyLanes.id,
-      teamSize: 3, // Teams of 3 players (different configuration)
+      tournamentId: superBowl.id,
+      name: 'Primera',
+      displayOrder: 1,
     },
   })
 
-  console.log('Created tournaments')
+  const groupSegunda = await prisma.tournamentGroup.create({
+    data: {
+      tournamentId: superBowl.id,
+      name: 'Segunda',
+      displayOrder: 2,
+    },
+  })
 
-  // Create 72 players (4 per team × 18 teams)
-  const playerNames = [
-    'John Smith', 'Jane Doe', 'Mike Johnson', 'Sarah Williams',
-    'Robert Brown', 'Emily Jones', 'David Garcia', 'Lisa Martinez',
-    'William Rodriguez', 'Jennifer Lopez', 'James Anderson', 'Mary Taylor',
-    'Michael Thomas', 'Patricia Hernandez', 'Richard Moore', 'Linda Martin',
-    'Charles Jackson', 'Barbara White', 'Joseph Lee', 'Elizabeth Harris',
-    'Thomas Clark', 'Susan Lewis', 'Christopher Walker', 'Jessica Hall',
-    'Daniel Allen', 'Nancy Young', 'Matthew King', 'Karen Wright',
-    'Anthony Scott', 'Betty Green', 'Mark Adams', 'Dorothy Baker',
-    'Donald Nelson', 'Sandra Carter', 'Steven Mitchell', 'Ashley Perez',
-    'Paul Roberts', 'Kimberly Turner', 'Andrew Phillips', 'Donna Campbell',
-    'Joshua Parker', 'Carol Evans', 'Kenneth Edwards', 'Michelle Collins',
-    'Kevin Stewart', 'Emily Morris', 'Brian Rogers', 'Amanda Reed',
-    'George Cook', 'Melissa Bailey', 'Edward Rivera', 'Deborah Cooper',
-    'Ronald Richardson', 'Stephanie Cox', 'Timothy Howard', 'Rebecca Ward',
-    'Jason Torres', 'Laura Peterson', 'Jeffrey Gray', 'Sharon Ramirez',
-    'Ryan James', 'Cynthia Watson', 'Jacob Brooks', 'Kathleen Kelly',
-    'Gary Sanders', 'Amy Price', 'Nicholas Bennett', 'Angela Wood',
-    'Eric Ross', 'Shirley Henderson', 'Stephen Coleman', 'Brenda Jenkins',
+  console.log('Created groups: Primera and Segunda')
+
+  // Create categories
+  const categoryA = await prisma.playerCategory.create({
+    data: {
+      tournamentId: superBowl.id,
+      name: 'Category A',
+      minAverage: null,
+      maxAverage: 20,
+      displayOrder: 1,
+    },
+  })
+
+  const categoryB = await prisma.playerCategory.create({
+    data: {
+      tournamentId: superBowl.id,
+      name: 'Category B',
+      minAverage: 21,
+      maxAverage: 35,
+      displayOrder: 2,
+    },
+  })
+
+  const categoryC = await prisma.playerCategory.create({
+    data: {
+      tournamentId: superBowl.id,
+      name: 'Category C',
+      minAverage: 36,
+      maxAverage: null,
+      displayOrder: 3,
+    },
+  })
+
+  console.log('Created categories: A, B, C')
+
+  // CSV Data
+  const csvData = [
+    { team: 'LO PLATICAMOS', group: 'Primera', player: 'Roberto Gasca', email: '', phone: '', handicap: 19, category: 'B', substitute: false },
+    { team: 'SUPERSONICOS', group: 'Primera', player: 'Hugo Gonzalez', email: '', phone: '', handicap: 18, category: 'B', substitute: false },
+    { team: 'MIGHTY DUCKS', group: 'Segunda', player: 'Ricardo Cuevas Sr', email: '', phone: '', handicap: 20, category: 'B', substitute: false },
+    { team: 'LOS CAPIBARA', group: 'Segunda', player: 'Manuel Gallardo', email: '', phone: '', handicap: 27, category: 'B', substitute: false },
+    { team: 'PECHOCHOS', group: 'Segunda', player: 'Alejandro Gomez', email: '', phone: '', handicap: 20, category: 'B', substitute: false },
+    { team: 'LOS 300', group: 'Primera', player: 'Adrian "Pippen" Amador', email: '', phone: '', handicap: 20, category: 'B', substitute: false },
+    { team: 'CORSARIOS', group: 'Primera', player: 'Gabriel Camarena', email: '', phone: '', handicap: 30, category: 'B', substitute: false },
+    { team: 'LINUX', group: 'Segunda', player: 'Brenda Espinosa', email: '', phone: '', handicap: 24, category: 'B', substitute: false },
+    { team: 'ASES Y REINAS', group: 'Primera', player: 'Isaias Gaona', email: '', phone: '', handicap: 29, category: 'B', substitute: false },
+    { team: 'PECHOCHOS', group: 'Segunda', player: 'Farid Fonseca', email: '', phone: '', handicap: 32, category: 'B', substitute: false },
+    { team: 'LINUX', group: 'Segunda', player: 'Felix Iniesta Jr', email: '', phone: '', handicap: 28, category: 'B', substitute: false },
+    { team: 'CORSARIOS', group: 'Primera', player: 'Ignacio Cedillo', email: '', phone: '', handicap: 23, category: 'B', substitute: false },
+    { team: 'LO PLATICAMOS', group: 'Primera', player: 'Isaac Gasca', email: '', phone: '', handicap: 29, category: 'B', substitute: false },
+    { team: 'CORSARIOS', group: 'Primera', player: 'Arturo Alvarez', email: '', phone: '', handicap: 30, category: 'B', substitute: false },
+    { team: 'MIGHTY DUCKS', group: 'Segunda', player: 'Regina Cuevas', email: '', phone: '', handicap: 25, category: 'B', substitute: false },
+    { team: 'LOS CAPIBARA', group: 'Segunda', player: 'Javo Viruega', email: '', phone: '', handicap: 18, category: 'B', substitute: false },
+    { team: 'KRONOS', group: 'Primera', player: 'Carlos Duchanoy', email: '', phone: '', handicap: 45, category: 'B', substitute: false },
+    { team: 'PECHOCHOS', group: 'Segunda', player: 'Jorge Torres', email: '', phone: '', handicap: 32, category: 'B', substitute: false },
+    { team: 'CHEFCITOS', group: 'Segunda', player: 'Andrea Rendón', email: '', phone: '', handicap: 24, category: 'B', substitute: false },
+    { team: 'CORSARIOS', group: 'Primera', player: 'Alex Camarena', email: '', phone: '', handicap: 27, category: 'B', substitute: false },
+    { team: 'SPLIT HAPPENS', group: 'Segunda', player: 'Rodrigo Casas', email: '', phone: '', handicap: 26, category: 'B', substitute: false },
+    { team: 'GUATEQUE', group: 'Primera', player: 'Daniel Calvo', email: '', phone: '', handicap: 21, category: 'B', substitute: false },
+    { team: 'LOS CAPIBARA', group: 'Segunda', player: 'Memo Viruega Jr', email: '', phone: '', handicap: 15, category: 'B', substitute: false },
+    { team: 'COYOTES', group: 'Segunda', player: 'Alfonso Zamudio', email: '', phone: '', handicap: 29, category: 'B', substitute: false },
+    { team: 'LOS INTOCABLES', group: 'Primera', player: 'Jose Luis Lizziy', email: '', phone: '', handicap: 0, category: 'A', substitute: false },
+    { team: 'LOS 300', group: 'Primera', player: 'Marco Camargo', email: '', phone: '', handicap: 12, category: 'A', substitute: false },
+    { team: 'CHEFCITOS', group: 'Segunda', player: 'Jorge Garcia', email: '', phone: '', handicap: 0, category: 'A', substitute: false },
+    { team: 'SPACE SOLUTIONS', group: 'Primera', player: 'Arturo Galán', email: '', phone: '', handicap: 6, category: 'A', substitute: false },
+    { team: 'CHEFCITOS', group: 'Segunda', player: 'Raul Arevalo', email: '', phone: '', handicap: 15, category: 'A', substitute: false },
+    { team: 'CHEFCITOS', group: 'Segunda', player: 'Memo Arellano Jr', email: '', phone: '', handicap: 2, category: 'A', substitute: false },
+    { team: 'LINUX', group: 'Segunda', player: 'Diego Bishop', email: '', phone: '', handicap: 0, category: 'A', substitute: false },
+    { team: 'LOS CAPIBARA', group: 'Segunda', player: 'Memo Viruega Sr', email: '', phone: '', handicap: 18, category: 'A', substitute: false },
+    { team: 'KRONOS', group: 'Primera', player: 'Oscar Torres', email: '', phone: '', handicap: 16, category: 'A', substitute: false },
+    { team: 'LOS INTOCABLES', group: 'Primera', player: 'Efren Lizziy', email: '', phone: '', handicap: 16, category: 'A', substitute: false },
+    { team: 'LOS INTOCABLES', group: 'Primera', player: 'Noe Gonzalez', email: '', phone: '', handicap: 13, category: 'A', substitute: false },
+    { team: 'LINUX', group: 'Segunda', player: 'Mario Espina', email: '', phone: '', handicap: 7, category: 'A', substitute: false },
+    { team: 'LOS 300', group: 'Primera', player: 'Beto Calvo', email: '', phone: '', handicap: 14, category: 'A', substitute: false },
+    { team: 'MIGHTY DUCKS', group: 'Segunda', player: 'Ricardo Cuevas Jr', email: '', phone: '', handicap: 15, category: 'A', substitute: false },
+    { team: 'COYOTES', group: 'Segunda', player: 'Francisco Leon', email: '', phone: '', handicap: 18, category: 'A', substitute: false },
+    { team: 'MIGHTY DUCKS', group: 'Segunda', player: 'Gerardo Cuevas', email: '', phone: '', handicap: 9, category: 'A', substitute: false },
+    { team: 'KRONOS', group: 'Primera', player: 'Jorge Gutierrez', email: '', phone: '', handicap: 19, category: 'A', substitute: false },
+    { team: 'LO PLATICAMOS', group: 'Primera', player: 'Fernando Arellano', email: '', phone: '', handicap: 17, category: 'A', substitute: false },
+    { team: 'SPACE SOLUTIONS', group: 'Primera', player: 'Mario Quintero', email: '', phone: '', handicap: 0, category: 'A', substitute: false },
+    { team: 'KRONOS', group: 'Primera', player: 'Jose Benito Chacón', email: '', phone: '', handicap: 19, category: 'A', substitute: false },
+    { team: 'SPACE SOLUTIONS', group: 'Primera', player: 'Pedro Jalili', email: '', phone: '', handicap: 31, category: 'A', substitute: false },
+    { team: 'ASES Y REINAS', group: 'Primera', player: 'Memo Arellano Sr', email: '', phone: '', handicap: 31, category: 'A', substitute: false },
+    { team: 'SUPERSONICOS', group: 'Primera', player: 'Alfredo Zahoul', email: '', phone: '', handicap: 32, category: 'C', substitute: false },
+    { team: 'TROYANOS', group: 'Segunda', player: 'Laura Mora', email: '', phone: '', handicap: 37, category: 'C', substitute: false },
+    { team: 'FANTASTIC FOUR', group: 'Segunda', player: 'Lupita Arellano', email: '', phone: '', handicap: 38, category: 'C', substitute: false },
+    { team: 'ASES Y REINAS', group: 'Primera', player: 'Vero Lizziy', email: '', phone: '', handicap: 34, category: 'C', substitute: false },
+    { team: 'ASES Y REINAS', group: 'Primera', player: 'Viridiana Ramirez', email: '', phone: '', handicap: 44, category: 'C', substitute: false },
+    { team: 'SPACE SOLUTIONS', group: 'Primera', player: 'Arturo Sanchez', email: '', phone: '', handicap: 55, category: 'C', substitute: false },
+    { team: 'PECHOCHOS', group: 'Segunda', player: 'Ramon Espinosa', email: '', phone: '', handicap: 31, category: 'C', substitute: false },
+    { team: 'SPLIT HAPPENS', group: 'Segunda', player: 'Bibiana Ortega', email: '', phone: '', handicap: 54, category: 'C', substitute: false },
+    { team: 'LOS 300', group: 'Primera', player: 'Ingrid de la Rosa', email: '', phone: '', handicap: 37, category: 'C', substitute: false },
+    { team: 'TROYANOS', group: 'Segunda', player: 'Luz Maria Ibarra', email: '', phone: '', handicap: 48, category: 'C', substitute: false },
+    { team: 'SPLIT HAPPENS', group: 'Segunda', player: 'Carlos Perez', email: '', phone: '', handicap: 51, category: 'C', substitute: false },
+    { team: 'FANTASTIC FOUR', group: 'Segunda', player: 'Jose Alvarado', email: '', phone: '', handicap: 42, category: 'C', substitute: false },
+    { team: 'SPLIT HAPPENS', group: 'Segunda', player: 'Juan Piñon', email: '', phone: '', handicap: 32, category: 'C', substitute: false },
+    { team: 'FANTASTIC FOUR', group: 'Segunda', player: 'Vicky Sierra', email: '', phone: '', handicap: 61, category: 'C', substitute: false },
+    { team: 'GUATEQUE', group: 'Primera', player: 'Cacayo Aguirre', email: '', phone: '', handicap: 44, category: 'C', substitute: false },
+    { team: 'TROYANOS', group: 'Segunda', player: 'Victor Beracha', email: '', phone: '', handicap: 55, category: 'C', substitute: false },
+    { team: 'SUPERSONICOS', group: 'Primera', player: 'Abraham Olvera', email: '', phone: '', handicap: 46, category: 'C', substitute: false },
+    { team: 'TROYANOS', group: 'Segunda', player: 'Becky Gordon', email: '', phone: '', handicap: 62, category: 'C', substitute: false },
+    { team: 'LO PLATICAMOS', group: 'Primera', player: 'Cesar Gasca', email: '', phone: '', handicap: 45, category: 'C', substitute: false },
+    { team: 'SUPERSONICOS', group: 'Primera', player: 'Alejandro Rico', email: '', phone: '', handicap: 43, category: 'C', substitute: false },
+    { team: 'FANTASTIC FOUR', group: 'Segunda', player: 'Blanca Araoz', email: '', phone: '', handicap: 62, category: 'C', substitute: false },
   ]
 
-  // Assign skill levels to players
-  const skillLevels: Array<'beginner' | 'intermediate' | 'advanced'> = []
-  for (let i = 0; i < playerNames.length; i++) {
-    if (i % 3 === 0) skillLevels.push('advanced')
-    else if (i % 3 === 1) skillLevels.push('intermediate')
-    else skillLevels.push('beginner')
-  }
-
-  const players = []
-  for (let i = 0; i < playerNames.length; i++) {
-    // Generate handicap based on skill level
-    const handicapBySkill = {
-      beginner: Math.floor(Math.random() * 20) + 30, // 30-50
-      intermediate: Math.floor(Math.random() * 15) + 15, // 15-30
-      advanced: Math.floor(Math.random() * 10) + 5, // 5-15
+  // Create players
+  const playerMap = new Map()
+  for (const row of csvData) {
+    if (!playerMap.has(row.player)) {
+      const player = await prisma.player.create({
+        data: {
+          name: row.player,
+          email: row.email || null,
+          phone: row.phone || null,
+          initialHandicap: row.handicap,
+        },
+      })
+      playerMap.set(row.player, { ...player, category: row.category })
     }
-
-    const player = await prisma.player.create({
-      data: {
-        name: playerNames[i],
-        email: `${playerNames[i].toLowerCase().replace(' ', '.')}@example.com`,
-        phone: `555-${String(1000 + i).padStart(4, '0')}`,
-        initialHandicap: handicapBySkill[skillLevels[i]],
-      },
-    })
-    players.push({ ...player, skillLevel: skillLevels[i] })
   }
 
-  console.log('Created 72 players with contact info and varying skill levels')
+  console.log(`Created ${playerMap.size} unique players`)
 
-  // Create 18 teams for Fall Championship
-  const teams = []
-  for (let i = 0; i < 18; i++) {
-    const lane = lanes[i]
+  // Group data by team
+  const teamData = new Map()
+  for (const row of csvData) {
+    if (!teamData.has(row.team)) {
+      teamData.set(row.team, {
+        name: row.team,
+        group: row.group,
+        players: [],
+      })
+    }
+    teamData.get(row.team)!.players.push({
+      name: row.player,
+      category: row.category,
+      substitute: row.substitute,
+    })
+  }
+
+  console.log(`Found ${teamData.size} unique teams`)
+
+  // Create teams and assign players
+  let laneIndex = 0
+  for (const [teamName, teamInfo] of teamData) {
+    const group = teamInfo.group === 'Primera' ? groupPrimera : groupSegunda
     const team = await prisma.team.create({
       data: {
-        name: `Team ${String.fromCharCode(65 + i)}`, // Team A, Team B, etc.
-        tournamentId: fallTournament.id,
-        laneId: lane.id,
+        name: teamName,
+        tournamentId: superBowl.id,
+        groupId: group.id,
+        laneId: laneIndex < lanes.length ? lanes[laneIndex].id : null,
       },
     })
 
-    // Assign 4 players to this team
-    const teamPlayerIds = players.slice(i * 4, i * 4 + 4)
-    for (const player of teamPlayerIds) {
-      await prisma.teamPlayer.create({
-        data: {
-          teamId: team.id,
-          playerId: player.id,
-          isReplacement: false,
-        },
-      })
-    }
+    laneIndex++
 
-    teams.push(team)
-  }
-
-  console.log('Created 18 teams with player assignments')
-
-  // Create 5 sessions (game days) with matchups
-  const today = new Date()
-  const sessions = []
-
-  for (let week = 0; week < 5; week++) {
-    const sessionDate = new Date(today)
-    sessionDate.setDate(today.getDate() - (14 - week * 7)) // Sessions from 2 weeks ago to 2 weeks ahead
-
-    const session = await prisma.session.create({
-      data: {
-        tournamentId: fallTournament.id,
-        sessionDate,
-      },
-    })
-
-    sessions.push(session)
-
-    // Create matchups for this session (9 matchups for 18 lanes)
-    for (let i = 0; i < lanes.length; i += 2) {
-      const lane = lanes[i]
-      const opponentLane = lanes[i + 1]
-
-      // Create matchup
-      const matchup = await prisma.sessionMatchup.create({
-        data: {
-          sessionId: session.id,
-          laneId: lane.id,
-          teamAId: teams[i].id,
-          teamBId: teams[i + 1].id,
-        },
-      })
-
-      // Add scores for both teams (only for past and current sessions)
-      if (week <= 2) {
-        // Team A players
-        const teamAPlayers = await prisma.teamPlayer.findMany({
-          where: { teamId: teams[i].id },
-          include: { player: true },
+    // Assign players to team
+    for (const playerInfo of teamInfo.players) {
+      const player = playerMap.get(playerInfo.name)
+      if (player) {
+        await prisma.teamPlayer.create({
+          data: {
+            teamId: team.id,
+            playerId: player.id,
+            isReplacement: playerInfo.substitute,
+            handicap: player.initialHandicap,
+          },
         })
-
-        for (const tp of teamAPlayers) {
-          const playerData = players.find((p) => p.id === tp.playerId)!
-          // 10% chance player is absent
-          const isAbsent = Math.random() < 0.1
-          const scores = generateBowlingScore(isAbsent ? 'absent' : playerData.skillLevel)
-
-          await prisma.teamPlayerSession.create({
-            data: {
-              teamPlayerId: tp.id,
-              sessionId: session.id,
-              laneId: lane.id,
-              line1: scores.line1,
-              line2: scores.line2,
-              line3: scores.line3,
-              handicap: scores.handicap,
-              assistance: !isAbsent,
-              payment: isAbsent ? false : Math.random() > 0.15, // 85% payment rate
-            },
-          })
-        }
-
-        // Team B players
-        const teamBPlayers = await prisma.teamPlayer.findMany({
-          where: { teamId: teams[i + 1].id },
-          include: { player: true },
-        })
-
-        for (const tp of teamBPlayers) {
-          const playerData = players.find((p) => p.id === tp.playerId)!
-          // 10% chance player is absent
-          const isAbsent = Math.random() < 0.1
-          const scores = generateBowlingScore(isAbsent ? 'absent' : playerData.skillLevel)
-
-          await prisma.teamPlayerSession.create({
-            data: {
-              teamPlayerId: tp.id,
-              sessionId: session.id,
-              laneId: opponentLane.id,
-              line1: scores.line1,
-              line2: scores.line2,
-              line3: scores.line3,
-              handicap: scores.handicap,
-              assistance: !isAbsent,
-              payment: isAbsent ? false : Math.random() > 0.15,
-            },
-          })
-        }
       }
     }
-
-    console.log(`Created session ${week + 1}/5 with matchups ${week <= 2 ? 'and scores' : '(no scores yet)'}`)
   }
 
-  console.log('Seed completed successfully!')
+  console.log('Created teams and assigned players')
+
+  // Assign players to categories
+  for (const [playerName, playerData] of playerMap) {
+    const category =
+      playerData.category === 'A'
+        ? categoryA
+        : playerData.category === 'B'
+        ? categoryB
+        : categoryC
+
+    await prisma.playerTournamentCategory.create({
+      data: {
+        playerId: playerData.id,
+        tournamentId: superBowl.id,
+        categoryId: category.id,
+        isManual: true,
+      },
+    })
+  }
+
+  console.log('Assigned all players to their categories')
+
+  console.log('\n=== Seed completed successfully! ===')
   console.log('Created:')
-  console.log('- 5 bowling alleys')
-  console.log('- 18 lanes (9 pairs)')
-  console.log('- 2 tournaments')
-  console.log('- 72 players with email, phone, and initial handicap')
-  console.log('- 18 teams')
-  console.log('- 5 sessions (3 with scores, 2 upcoming)')
-  console.log('- ~10% absence rate for realistic data')
+  console.log('- 1 bowling alley (Bol Insurgentes)')
+  console.log('- 18 lanes (lanes 17-34, 9 pairs)')
+  console.log('- 1 tournament (Super Bowl)')
+  console.log('- 2 groups (Primera, Segunda)')
+  console.log('- 3 categories (A, B, C)')
+  console.log(`- ${playerMap.size} players`)
+  console.log(`- ${teamData.size} teams`)
 }
 
 main()
