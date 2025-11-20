@@ -208,11 +208,8 @@ export default function CreateTournamentPage() {
       if (!importResult.success) {
         // Tournament was created but import failed
         setError(
-          `Tournament created but CSV import failed: ${importResult.error}. You can manually add teams or try importing again from the tournament page.`
+          `Tournament created but CSV import failed: ${importResult.error}. You can manually add teams by visiting the tournament page or try importing again.`
         );
-        setTimeout(() => {
-          router.push(`/tournaments/${tournamentId}`);
-        }, 8000);
         return;
       }
 
