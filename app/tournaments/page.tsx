@@ -97,72 +97,98 @@ export default function TournamentsPage() {
           </div>
         )}
 
-        {/* Tournaments List */}
-        <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
-          <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">All Tournaments</h2>
-              <span className="text-sm text-zinc-600 dark:text-zinc-400">
-                {tournaments.length} tournament{tournaments.length !== 1 ? 's' : ''}
-              </span>
-            </div>
-          </div>
+        {/* Tournament Count */}
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
+            All Tournaments
+          </h2>
+          <span className="text-sm text-zinc-600 dark:text-zinc-400">
+            {tournaments.length} tournament{tournaments.length !== 1 ? 's' : ''}
+          </span>
+        </div>
 
-          {tournaments.length === 0 ? (
-            <div className="p-12 text-center">
-              <p className="text-zinc-600 dark:text-zinc-400 text-lg">No tournaments yet</p>
-              <button
-                onClick={() => router.push('/tournaments/create')}
-                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        {/* Tournaments Grid */}
+        {tournaments.length === 0 ? (
+          <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 p-12 text-center">
+            <p className="text-zinc-600 dark:text-zinc-400 text-lg">No tournaments yet</p>
+            <button
+              onClick={() => router.push('/tournaments/create')}
+              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Create First Tournament
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {tournaments.map((tournament) => (
+              <div
+                key={tournament.id}
+                onClick={() => router.push(`/tournaments/${tournament.id}`)}
+                className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 p-5 hover:border-blue-500 dark:hover:border-blue-500 hover:shadow-lg transition-all cursor-pointer"
               >
-                Create First Tournament
-              </button>
-            </div>
-          ) : (
-            <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
-              {tournaments.map((tournament) => (
-                <div
-                  key={tournament.id}
-                  className="px-6 py-4 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <button
-                        onClick={() => router.push(`/tournaments/${tournament.id}`)}
-                        className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-left"
-                      >
-                        {tournament.name}
-                      </button>
-                      <div className="mt-1 flex items-center gap-4 text-sm text-zinc-600 dark:text-zinc-400">
-                        <span>🎯 {tournament.bowling.name}</span>
-                        <span>👥 {tournament.teamSize} players per team</span>
-                        <span>🎳 {tournament._count.teams} teams</span>
-                        <span>📅 {tournament._count.sessions} sessions</span>
-                        <span>
-                          Added {new Date(tournament.createdAt).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => router.push(`/tournaments/${tournament.id}/edit`)}
-                        className="px-3 py-1 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => router.push(`/tournaments/${tournament.id}`)}
-                        className="px-3 py-1 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50 transition-colors"
-                      >
-                        View Details →
-                      </button>
-                    </div>
+                {/* Tournament Header */}
+                <div className="flex items-start gap-3 mb-4">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
+                    <span className="text-white font-bold text-xl">🏆</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 truncate">
+                      {tournament.name}
+                    </h3>
+                    <p className="text-sm text-zinc-500 dark:text-zinc-500">
+                      {tournament.bowling.name}
+                    </p>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
+
+                {/* Tournament Details */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm">
+                    <svg className="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    <span className="text-zinc-600 dark:text-zinc-400">
+                      {tournament.teamSize} players per team
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <svg className="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <span className="text-zinc-600 dark:text-zinc-400">
+                      Added {new Date(tournament.createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Tournament Stats */}
+                <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                      {tournament._count.teams}
+                    </p>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-500">Teams</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                      {tournament._count.sessions}
+                    </p>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-500">Sessions</p>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      router.push(`/tournaments/${tournament.id}`);
+                    }}
+                    className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium"
+                  >
+                    View Details →
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

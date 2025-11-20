@@ -55,6 +55,16 @@ export default function BowlingPage() {
     return `Lanes ${laneNumbers[0]}-${laneNumbers[laneNumbers.length - 1]}`;
   };
 
+  const getLaneCount = (lanes?: Lane[]) => {
+    if (!lanes || lanes.length === 0) return 0;
+    return lanes.length;
+  };
+
+  const getLanePairCount = (lanes?: Lane[]) => {
+    if (!lanes || lanes.length === 0) return 0;
+    return Math.floor(lanes.length / 2);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center">
@@ -103,64 +113,98 @@ export default function BowlingPage() {
           </div>
         )}
 
-        {/* Bowling Alleys List */}
-        <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
-          <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">All Bowling Alleys</h2>
-              <span className="text-sm text-zinc-600 dark:text-zinc-400">
-                {bowlingAlleys.length} bowling alley{bowlingAlleys.length !== 1 ? 's' : ''}
-              </span>
-            </div>
-          </div>
+        {/* Bowling Alleys Count */}
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
+            All Bowling Alleys
+          </h2>
+          <span className="text-sm text-zinc-600 dark:text-zinc-400">
+            {bowlingAlleys.length} bowling alley{bowlingAlleys.length !== 1 ? 's' : ''}
+          </span>
+        </div>
 
-          {bowlingAlleys.length === 0 ? (
-            <div className="p-12 text-center">
-              <p className="text-zinc-600 dark:text-zinc-400 text-lg">No bowling alleys yet</p>
-              <button
-                onClick={() => router.push('/bowling/create')}
-                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        {/* Bowling Alleys Grid */}
+        {bowlingAlleys.length === 0 ? (
+          <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 p-12 text-center">
+            <p className="text-zinc-600 dark:text-zinc-400 text-lg">No bowling alleys yet</p>
+            <button
+              onClick={() => router.push('/bowling/create')}
+              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Create First Bowling Alley
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {bowlingAlleys.map((bowling) => (
+              <div
+                key={bowling.id}
+                onClick={() => router.push(`/bowling/${bowling.id}`)}
+                className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 p-5 hover:border-blue-500 dark:hover:border-blue-500 hover:shadow-lg transition-all cursor-pointer"
               >
-                Create First Bowling Alley
-              </button>
-            </div>
-          ) : (
-            <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
-              {bowlingAlleys.map((bowling) => (
-                <div
-                  key={bowling.id}
-                  className="px-6 py-4 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <button
-                        onClick={() => router.push(`/bowling/${bowling.id}`)}
-                        className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-left"
-                      >
-                        {bowling.name}
-                      </button>
-                      <div className="mt-1 flex items-center gap-4 text-sm text-zinc-600 dark:text-zinc-400">
-                        <span>🎳 {getLaneRangeDisplay(bowling.lanes)}</span>
-                        <span>🏆 {bowling._count.tournaments} tournaments</span>
-                        <span>
-                          Added {new Date(bowling.createdAt).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => router.push(`/bowling/${bowling.id}`)}
-                        className="px-3 py-1 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50 transition-colors"
-                      >
-                        View Details →
-                      </button>
-                    </div>
+                {/* Bowling Alley Header */}
+                <div className="flex items-start gap-3 mb-4">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center flex-shrink-0">
+                    <span className="text-white font-bold text-xl">🎳</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 truncate">
+                      {bowling.name}
+                    </h3>
+                    <p className="text-sm text-zinc-500 dark:text-zinc-500">
+                      {getLaneRangeDisplay(bowling.lanes)}
+                    </p>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
+
+                {/* Bowling Alley Details */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm">
+                    <svg className="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                    <span className="text-zinc-600 dark:text-zinc-400">
+                      {getLaneCount(bowling.lanes)} total lanes
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <svg className="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <span className="text-zinc-600 dark:text-zinc-400">
+                      Added {new Date(bowling.createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Bowling Alley Stats */}
+                <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                      {getLanePairCount(bowling.lanes)}
+                    </p>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-500">Pairs</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                      {bowling._count.tournaments}
+                    </p>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-500">Tournaments</p>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      router.push(`/bowling/${bowling.id}`);
+                    }}
+                    className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium"
+                  >
+                    View Details →
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
