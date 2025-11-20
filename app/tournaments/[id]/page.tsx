@@ -154,6 +154,25 @@ export default function TournamentDetailPage() {
     }
   };
 
+  const getScoreStatus = (session: any): { text: string; color: string } => {
+    // Calculate total expected scores (players from all matchups)
+    const totalExpected = session.sessionMatchups.reduce((sum: number, matchup: any) => {
+      const teamACount = matchup.teamA?._count?.teamPlayers || 0;
+      const teamBCount = matchup.teamB?._count?.teamPlayers || 0;
+      return sum + teamACount + teamBCount;
+    }, 0);
+
+    const scoresEntered = session._count.teamPlayerSessions || 0;
+
+    if (scoresEntered === 0) {
+      return { text: 'No scores', color: 'text-zinc-500 dark:text-zinc-400' };
+    } else if (scoresEntered < totalExpected) {
+      return { text: 'Incomplete', color: 'text-orange-600 dark:text-orange-400' };
+    } else {
+      return { text: 'Scores entered', color: 'text-green-600 dark:text-green-400' };
+    }
+  };
+
   const createGroup = async () => {
     if (!newGroupName.trim()) return;
 
@@ -1416,16 +1435,15 @@ export default function TournamentDetailPage() {
                         </p>
                       </div>
                       <div className="text-right">
-                        <div className="text-sm text-zinc-600 dark:text-zinc-400">
-                          {session._count.teamPlayerSessions > 0 ? (
-                            <span className="text-green-600 dark:text-green-400 font-semibold">
-                              Scores Entered
-                            </span>
-                          ) : (
-                            <span className="text-orange-600 dark:text-orange-400 font-semibold">
-                              No Scores
-                            </span>
-                          )}
+                        <div className="text-sm">
+                          {(() => {
+                            const status = getScoreStatus(session);
+                            return (
+                              <span className={`${status.color} font-semibold`}>
+                                {status.text}
+                              </span>
+                            );
+                          })()}
                         </div>
                       </div>
                     </div>
