@@ -270,6 +270,29 @@ export default function SessionDetailPage() {
     }
   };
 
+  const handleDeleteMatchup = async (matchupId: number, laneNumber: number, opponentLaneNumber: number | undefined) => {
+    if (!confirm(`Are you sure you want to delete the matchup for Lane ${laneNumber} vs Lane ${opponentLaneNumber}? This will remove all scores associated with this matchup.`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/session-matchups/${matchupId}`, {
+        method: 'DELETE',
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        fetchSessionData();
+      } else {
+        alert(result.error || 'Failed to delete matchup');
+      }
+    } catch (err) {
+      console.error('Failed to delete matchup:', err);
+      alert('Failed to delete matchup');
+    }
+  };
+
   const updateScore = (
     matchupId: number,
     team: 'teamA' | 'teamB',
@@ -438,9 +461,17 @@ export default function SessionDetailPage() {
               >
                 {/* Matchup Header */}
                 <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50">
-                  <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50 mb-3">
-                    Lane {matchup.lane.laneNumber} vs Lane {matchup.lane.opponentLane?.laneNumber}
-                  </h2>
+                  <div className="flex items-center justify-between mb-3">
+                    <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
+                      Lane {matchup.lane.laneNumber} vs Lane {matchup.lane.opponentLane?.laneNumber}
+                    </h2>
+                    <button
+                      onClick={() => handleDeleteMatchup(matchup.id, matchup.lane.laneNumber, matchup.lane.opponentLane?.laneNumber)}
+                      className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                    >
+                      Delete Matchup
+                    </button>
+                  </div>
 
                   {/* Team Selection */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
