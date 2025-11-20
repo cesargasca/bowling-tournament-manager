@@ -4,7 +4,12 @@ import { successResponse, errorResponse, handleApiError } from '@/lib/utils/api'
 import { z } from 'zod'
 
 const manageTeamPlayersSchema = z.object({
-  addPlayerIds: z.array(z.number().int().positive()).optional().default([]),
+  addPlayers: z.array(
+    z.object({
+      playerId: z.number().int().positive(),
+      isReplacement: z.boolean().default(false),
+    })
+  ).optional().default([]),
   removePlayerIds: z.array(z.number().int().positive()).optional().default([]),
 })
 
@@ -23,7 +28,7 @@ export async function POST(
       return errorResponse(validation.error.errors[0].message, 400)
     }
 
-    const { addPlayerIds, removePlayerIds } = validation.data
+    const { addPlayers, removePlayerIds } = validation.data
 
     // Get the team to find its tournament
     const team = await prisma.team.findUnique({
@@ -38,10 +43,11 @@ export async function POST(
     // Perform operations in a transaction
     const updatedTeam = await prisma.$transaction(async (tx) => {
       // If adding players, check they're not already in another team in this tournament
-      if (addPlayerIds.length > 0) {
+      if (addPlayers.length > 0) {
+        const playerIds = addPlayers.map(p => p.playerId)
         const existingTeamPlayers = await tx.teamPlayer.findMany({
           where: {
-            playerId: { in: addPlayerIds },
+            playerId: { in: playerIds },
             team: {
               tournamentId: team.tournamentId,
             },
@@ -71,10 +77,10 @@ export async function POST(
 
         // Add new players
         await tx.teamPlayer.createMany({
-          data: addPlayerIds.map((playerId) => ({
+          data: addPlayers.map((player) => ({
             teamId,
-            playerId,
-            isReplacement: false,
+            playerId: player.playerId,
+            isReplacement: player.isReplacement,
           })),
           skipDuplicates: true, // Skip if player is already in this team
         })
