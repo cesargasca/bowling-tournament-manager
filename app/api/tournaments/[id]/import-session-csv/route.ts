@@ -127,10 +127,11 @@ function parseSessionDate(dateStr: string, baseYear?: number): Date {
 // POST /api/tournaments/[id]/import-session-csv - Import session schedule from CSV
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const tournamentId = parseInt(params.id, 10)
+    const { id } = await params
+    const tournamentId = parseInt(id, 10)
 
     if (isNaN(tournamentId)) {
       return errorResponse('Invalid tournament ID', 400)
