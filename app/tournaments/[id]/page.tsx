@@ -292,31 +292,6 @@ export default function TournamentDetailPage() {
     }
   };
 
-  const autoAssignCategories = async () => {
-    if (!confirm('Auto-assign unassigned players to categories based on their current average? This only affects players who are not yet assigned to a category.')) {
-      return;
-    }
-
-    try {
-      const response = await fetch(
-        `/api/tournaments/${tournamentId}/categories/auto-assign`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
-
-      if (response.ok) {
-        const result = await response.json();
-        alert(result.data.message);
-        fetchTournamentDetails();
-      }
-    } catch (err) {
-      console.error('Failed to auto-assign:', err);
-      alert('Failed to auto-assign players');
-    }
-  };
-
   // Bulk operations
   const toggleTeamSelection = (teamId: number) => {
     const newSelection = new Set(selectedTeamIds);
@@ -998,27 +973,6 @@ export default function TournamentDetailPage() {
                     </button>
                   </div>
                 </div>
-                {data.categories.length > 0 && (
-                  <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900 rounded-lg p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="font-semibold text-zinc-900 dark:text-zinc-50">
-                          Auto-Assign Players to Categories
-                        </h3>
-                        <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
-                          Automatically assign unassigned players to categories based on their current average.
-                          Once assigned, players stay in their category for the entire tournament.
-                        </p>
-                      </div>
-                      <button
-                        onClick={autoAssignCategories}
-                        className="ml-4 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors whitespace-nowrap"
-                      >
-                        Auto-Assign
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 
