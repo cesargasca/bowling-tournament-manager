@@ -358,8 +358,15 @@ export default function SessionDetailPage() {
   }
 
   // Find lanes that don't have matchups yet
+  // Exclude both lanes that are directly assigned AND lanes whose opponent is assigned
   const assignedLaneIds = session.sessionMatchups.map((m) => m.laneId);
-  const unassignedLanes = lanes.filter((lane) => !assignedLaneIds.includes(lane.id));
+  const assignedOpponentLaneIds = session.sessionMatchups
+    .map((m) => m.lane.opponentLaneId)
+    .filter((id): id is number => id !== null);
+
+  const unassignedLanes = lanes.filter(
+    (lane) => !assignedLaneIds.includes(lane.id) && !assignedOpponentLaneIds.includes(lane.id)
+  );
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
