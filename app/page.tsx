@@ -130,7 +130,7 @@ export default function AdminDashboard() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Overview Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           <StatCard
             title="Tournaments"
             value={data.overview.totalTournaments}
@@ -144,6 +144,13 @@ export default function AdminDashboard() {
             icon="👥"
             color="bg-green-500"
             onClick={() => router.push('/players')}
+          />
+          <StatCard
+            title="Bowling Alleys"
+            value={data.overview.totalBowlingAlleys}
+            icon="🎳"
+            color="bg-purple-500"
+            onClick={() => router.push('/bowling')}
           />
         </div>
 
