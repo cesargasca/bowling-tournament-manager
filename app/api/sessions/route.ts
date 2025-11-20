@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
 
     const sessions = await prisma.session.findMany({
       where,
-      orderBy: { sessionDate: 'desc' },
+      orderBy: { sessionDate: 'asc' },
       include: {
         tournament: {
           select: {

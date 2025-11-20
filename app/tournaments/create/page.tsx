@@ -36,6 +36,11 @@ export default function CreateTournamentPage() {
   const [csvPreview, setCsvPreview] = useState<string>('');
   const [csvError, setCsvError] = useState<string | null>(null);
 
+  // Session CSV states
+  const [sessionCsvFile, setSessionCsvFile] = useState<File | null>(null);
+  const [sessionCsvYear, setSessionCsvYear] = useState('');
+  const [sessionCsvError, setSessionCsvError] = useState<string | null>(null);
+
   useEffect(() => {
     fetchBowlingAlleys();
   }, []);
@@ -166,8 +171,11 @@ export default function CreateTournamentPage() {
 
     setLoading(true);
     setError(null);
+    setSessionCsvError(null);
 
     try {
+      let tournamentId: number;
+
       // If CSV data is provided, import as part of tournament creation
       if (csvData.length > 0) {
         const response = await fetch('/api/tournaments/import-csv', {
@@ -189,8 +197,7 @@ export default function CreateTournamentPage() {
           return;
         }
 
-        // Success - redirect to tournament
-        router.push(`/tournaments/${result.data.tournamentId}`);
+        tournamentId = result.data.tournamentId;
       } else {
         // Create tournament without CSV import
         const response = await fetch('/api/tournaments', {
@@ -211,9 +218,35 @@ export default function CreateTournamentPage() {
           return;
         }
 
-        // Success - redirect to tournament
-        router.push(`/tournaments/${result.data.id}`);
+        tournamentId = result.data.id;
       }
+
+      // If session CSV is provided, import sessions
+      if (sessionCsvFile) {
+        const formData = new FormData();
+        formData.append('file', sessionCsvFile);
+        if (sessionCsvYear) {
+          formData.append('year', sessionCsvYear);
+        }
+
+        const sessionResponse = await fetch(`/api/tournaments/${tournamentId}/import-session-csv`, {
+          method: 'POST',
+          body: formData,
+        });
+
+        const sessionResult = await sessionResponse.json();
+
+        if (!sessionResult.success) {
+          // Tournament was created, but session import failed
+          setSessionCsvError(sessionResult.error || 'Failed to import sessions. You can import them later from the tournament page.');
+          // Still redirect to tournament page
+          setTimeout(() => router.push(`/tournaments/${tournamentId}`), 3000);
+          return;
+        }
+      }
+
+      // Success - redirect to tournament
+      router.push(`/tournaments/${tournamentId}`);
     } catch (err: any) {
       setError(err.message || 'Failed to create tournament');
     } finally {
@@ -436,6 +469,76 @@ Team 3,Group B,Max Extra,,,18,B League,Yes`}
                   • Category: Optional, used to classify players (e.g., "A League", "B League")<br />
                   • Substitute: Mark with "S", "Substitute", "Yes", "1", or "true" (case-insensitive). Leave blank for regular players<br />
                   • Groups and categories will be created automatically if they don't exist
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Session Schedule CSV Import (Optional) */}
+          <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6">
+            <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50 mb-2">
+              Import Session Schedule (Optional)
+            </h2>
+            <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-6">
+              Upload a CSV file with your tournament session schedule. This will create all sessions and matchups automatically.
+              You can also skip this step and import sessions later from the tournament page.
+            </p>
+
+            {sessionCsvError && (
+              <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                <p className="text-sm text-red-800 dark:text-red-200">{sessionCsvError}</p>
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                  Session Schedule CSV File
+                </label>
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={(e) => setSessionCsvFile(e.target.files?.[0] || null)}
+                  className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-blue-900/20 dark:file:text-blue-400"
+                />
+                <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-500">
+                  Required columns: Session, Date, Lane1, Lane2, Lane3, etc.<br />
+                  Download <a href="/session-import-template.csv" className="text-blue-600 hover:underline">template file</a> for reference.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                  Tournament Year (optional)
+                </label>
+                <input
+                  type="number"
+                  value={sessionCsvYear}
+                  onChange={(e) => setSessionCsvYear(e.target.value)}
+                  placeholder={new Date().getFullYear().toString()}
+                  min="2000"
+                  max="2100"
+                  className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50"
+                />
+                <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-500">
+                  Specify the year for date parsing. Defaults to current year if not provided.
+                </p>
+              </div>
+
+              <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg">
+                <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50 mb-2">
+                  Example Session CSV format:
+                </p>
+                <pre className="text-xs text-zinc-600 dark:text-zinc-400 overflow-x-auto">
+{`Session,Date,Lane17,Lane18,Lane19,Lane20,...
+1a,Nov 11,TEAM1,TEAM2,TEAM3,TEAM4,...
+2a,Nov 18,TEAM5,TEAM6,TEAM7,TEAM8,...`}
+                </pre>
+                <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-500">
+                  <strong>Important:</strong><br />
+                  • Team names must match exactly with teams in your Teams CSV<br />
+                  • Lane numbers should match your bowling alley configuration<br />
+                  • Sessions will be imported after tournament and teams are created
                 </p>
               </div>
             </div>
