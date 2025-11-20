@@ -78,15 +78,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Validate team sizes match tournament configuration
+    // Validate substitute counts don't exceed tournament configuration
     const invalidTeams: string[] = []
     for (const [teamName, data] of teamMap.entries()) {
-      const regularPlayerCount = data.players.length
       const substitutePlayerCount = data.substitutes.length
-
-      if (regularPlayerCount !== tournament.teamSize) {
-        invalidTeams.push(`${teamName} (has ${regularPlayerCount} regular players, needs ${tournament.teamSize})`)
-      }
 
       if (substitutePlayerCount > tournament.substituteCount) {
         invalidTeams.push(`${teamName} (has ${substitutePlayerCount} substitutes, maximum allowed is ${tournament.substituteCount})`)
@@ -95,7 +90,7 @@ export async function POST(request: NextRequest) {
 
     if (invalidTeams.length > 0) {
       return errorResponse(
-        `Invalid team sizes: ${invalidTeams.join(', ')}`,
+        `Teams exceed substitute limits: ${invalidTeams.join(', ')}`,
         400
       )
     }

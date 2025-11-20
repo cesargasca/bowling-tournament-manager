@@ -212,7 +212,7 @@ export default function CreateTournamentPage() {
         );
         setTimeout(() => {
           router.push(`/tournaments/${tournamentId}`);
-        }, 3000);
+        }, 8000);
         return;
       }
 
@@ -296,7 +296,7 @@ export default function CreateTournamentPage() {
 
               <div>
                 <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-                  Team Size (players per team) *
+                  Team Size (expected players per team) *
                 </label>
                 <input
                   type="number"
@@ -308,7 +308,7 @@ export default function CreateTournamentPage() {
                   required
                 />
                 <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">
-                  Each team in this tournament will require exactly {teamSize} player{teamSize !== '1' ? 's' : ''}. This cannot be changed later.
+                  Expected number of regular players per team (excluding substitutes). Teams can have more or fewer players, and warnings will be shown in team details.
                 </p>
               </div>
 
