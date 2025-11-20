@@ -1091,7 +1091,7 @@ export default function TournamentDetailPage() {
                             </td>
                             <td className="py-4 px-6">
                               <button
-                                onClick={() => router.push(`/players/${player.playerId}`)}
+                                onClick={() => router.push(`/players/${player.playerId}?tournamentId=${tournamentId}`)}
                                 className="text-zinc-900 dark:text-zinc-50 font-medium hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-left"
                               >
                                 {player.playerName}
