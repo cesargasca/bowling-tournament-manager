@@ -110,6 +110,11 @@ export const addTeamPlayerSchema = z.object({
   teamId: z.number().int().positive(),
   playerId: z.number().int().positive(),
   isReplacement: z.boolean().default(false),
+  handicap: z.number().int().min(0, 'Handicap cannot be negative').max(100, 'Handicap cannot exceed 100').optional(),
+})
+
+export const updateTeamPlayerSchema = z.object({
+  handicap: z.number().int().min(0, 'Handicap cannot be negative').max(100, 'Handicap cannot exceed 100'),
 })
 
 // Handicap calculation input
@@ -155,4 +160,5 @@ export type CreateLaneInput = z.infer<typeof createLaneSchema>
 export type UpdateLaneInput = z.infer<typeof updateLaneSchema>
 export type ScoreEntryInput = z.infer<typeof scoreEntrySchema>
 export type AddTeamPlayerInput = z.infer<typeof addTeamPlayerSchema>
+export type UpdateTeamPlayerInput = z.infer<typeof updateTeamPlayerSchema>
 export type CalculateHandicapInput = z.infer<typeof calculateHandicapSchema>

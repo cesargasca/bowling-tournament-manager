@@ -75,15 +75,30 @@ export async function POST(
           )
         }
 
-        // Add new players
-        await tx.teamPlayer.createMany({
-          data: addPlayers.map((player) => ({
-            teamId,
-            playerId: player.playerId,
-            isReplacement: player.isReplacement,
-          })),
-          skipDuplicates: true, // Skip if player is already in this team
-        })
+        // Add new players with their initial handicaps
+        for (const player of addPlayers) {
+          // Get the player's initial handicap
+          const playerData = await tx.player.findUnique({
+            where: { id: player.playerId },
+            select: { initialHandicap: true },
+          })
+
+          await tx.teamPlayer.upsert({
+            where: {
+              teamId_playerId: {
+                teamId,
+                playerId: player.playerId,
+              },
+            },
+            create: {
+              teamId,
+              playerId: player.playerId,
+              isReplacement: player.isReplacement,
+              handicap: playerData?.initialHandicap ?? 0,
+            },
+            update: {}, // Don't update if already exists
+          })
+        }
       }
 
       // Remove players

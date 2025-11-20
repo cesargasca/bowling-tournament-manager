@@ -21,6 +21,8 @@ interface PlayerStanding {
   playerId: number;
   playerName: string;
   teamName: string;
+  teamPlayerId: number;
+  handicap: number;
   categoryId: number | null;
   categoryName: string | null;
   isManualCategory: boolean;
@@ -161,6 +163,8 @@ export async function GET(
           playerId,
           playerName,
           teamName,
+          teamPlayerId: teamPlayer.id,
+          handicap: teamPlayer.handicap,
           categoryId: categoryInfo?.categoryId || null,
           categoryName: categoryInfo?.categoryName || null,
           isManualCategory: categoryInfo?.isManual || false,
