@@ -78,23 +78,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Validate substitute counts don't exceed tournament configuration
-    const invalidTeams: string[] = []
-    for (const [teamName, data] of teamMap.entries()) {
-      const substitutePlayerCount = data.substitutes.length
-
-      if (substitutePlayerCount > tournament.substituteCount) {
-        invalidTeams.push(`${teamName} (has ${substitutePlayerCount} substitutes, maximum allowed is ${tournament.substituteCount})`)
-      }
-    }
-
-    if (invalidTeams.length > 0) {
-      return errorResponse(
-        `Teams exceed substitute limits: ${invalidTeams.join(', ')}`,
-        400
-      )
-    }
-
     // Process the import in a transaction
     const result = await prisma.$transaction(async (tx) => {
       const createdTeams: any[] = []

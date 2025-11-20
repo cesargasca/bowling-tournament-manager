@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
             id: true,
             name: true,
             teamSize: true,
+            substituteCount: true,
           },
         },
         teamPlayers: {
@@ -40,16 +41,26 @@ export async function GET(request: NextRequest) {
     // Add warnings for each team
     const teamsWithWarnings = teams.map((team) => {
       const warnings: string[] = []
-      const playerCount = team.teamPlayers.length
+      const regularPlayers = team.teamPlayers.filter(tp => !tp.isReplacement)
+      const substitutes = team.teamPlayers.filter(tp => tp.isReplacement)
+      const regularPlayerCount = regularPlayers.length
+      const substituteCount = substitutes.length
       const expectedPlayerCount = team.tournament.teamSize
+      const expectedSubstituteCount = team.tournament.substituteCount || 0
 
-      if (playerCount > expectedPlayerCount) {
+      if (regularPlayerCount > expectedPlayerCount) {
         warnings.push(
-          `Team has ${playerCount} players, which is more than the expected ${expectedPlayerCount} players per team.`
+          `Team has ${regularPlayerCount} regular players, which is more than the expected ${expectedPlayerCount}.`
         )
-      } else if (playerCount < expectedPlayerCount) {
+      } else if (regularPlayerCount < expectedPlayerCount) {
         warnings.push(
-          `Team has ${playerCount} players, which is less than the expected ${expectedPlayerCount} players per team.`
+          `Team has ${regularPlayerCount} regular players, which is less than the expected ${expectedPlayerCount}.`
+        )
+      }
+
+      if (substituteCount > expectedSubstituteCount) {
+        warnings.push(
+          `Team has ${substituteCount} substitutes, which is more than the expected ${expectedSubstituteCount}.`
         )
       }
 

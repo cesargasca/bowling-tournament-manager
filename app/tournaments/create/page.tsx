@@ -294,39 +294,73 @@ export default function CreateTournamentPage() {
                 </select>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-                  Team Size (expected players per team) *
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="10"
-                  value={teamSize}
-                  onChange={(e) => setTeamSize(e.target.value)}
-                  className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50"
-                  required
-                />
-                <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">
-                  Expected number of regular players per team (excluding substitutes). Teams can have more or fewer players, and warnings will be shown in team details.
-                </p>
-              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                    Regular Players per Team *
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setTeamSize(Math.max(1, parseInt(teamSize) - 1).toString())}
+                      className="w-10 h-10 flex items-center justify-center bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-50 rounded-lg hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-colors"
+                    >
+                      −
+                    </button>
+                    <input
+                      type="number"
+                      min="1"
+                      max="10"
+                      value={teamSize}
+                      onChange={(e) => setTeamSize(e.target.value)}
+                      className="flex-1 px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50 text-center text-lg font-semibold"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setTeamSize(Math.min(10, parseInt(teamSize) + 1).toString())}
+                      className="w-10 h-10 flex items-center justify-center bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-50 rounded-lg hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-colors"
+                    >
+                      +
+                    </button>
+                  </div>
+                  <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-500">
+                    Expected number of regular players per team. Teams can have different amounts - warnings will be shown if they don't match.
+                  </p>
+                </div>
 
-              <div>
-                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-                  Substitutes per Team
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  max="10"
-                  value={substituteCount}
-                  onChange={(e) => setSubstituteCount(e.target.value)}
-                  className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50"
-                />
-                <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">
-                  Number of substitute players allowed per team (0-{substituteCount}). Mark substitutes with "S" or "Substitute" in the CSV Substitute column.
-                </p>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                    Substitutes per Team
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setSubstituteCount(Math.max(0, parseInt(substituteCount) - 1).toString())}
+                      className="w-10 h-10 flex items-center justify-center bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-50 rounded-lg hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-colors"
+                    >
+                      −
+                    </button>
+                    <input
+                      type="number"
+                      min="0"
+                      max="10"
+                      value={substituteCount}
+                      onChange={(e) => setSubstituteCount(e.target.value)}
+                      className="flex-1 px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50 text-center text-lg font-semibold"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setSubstituteCount(Math.min(10, parseInt(substituteCount) + 1).toString())}
+                      className="w-10 h-10 flex items-center justify-center bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-50 rounded-lg hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-colors"
+                    >
+                      +
+                    </button>
+                  </div>
+                  <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-500">
+                    Expected number of substitutes. Mark substitutes with "S", "Substitute", or "Yes" in the CSV. Teams can have more - warnings will be shown.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
