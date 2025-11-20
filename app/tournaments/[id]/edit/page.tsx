@@ -7,6 +7,7 @@ interface Tournament {
   id: number;
   name: string;
   teamSize: number;
+  substituteCount: number;
   bowlingId: number;
   bowling: {
     id: number;
@@ -38,6 +39,7 @@ export default function EditTournamentPage() {
   const [tournamentName, setTournamentName] = useState('');
   const [selectedBowlingId, setSelectedBowlingId] = useState('');
   const [teamSize, setTeamSize] = useState('4');
+  const [substituteCount, setSubstituteCount] = useState('0');
 
   useEffect(() => {
     fetchTournament();
@@ -55,6 +57,7 @@ export default function EditTournamentPage() {
         setTournamentName(result.data.name);
         setSelectedBowlingId(result.data.bowlingId.toString());
         setTeamSize(result.data.teamSize.toString());
+        setSubstituteCount(result.data.substituteCount?.toString() || '0');
       } else {
         setError(result.error || 'Failed to load tournament');
       }
@@ -256,6 +259,23 @@ export default function EditTournamentPage() {
               />
               <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">
                 Team size cannot be changed after tournament creation. Each team requires exactly {teamSize} player{teamSize !== '1' ? 's' : ''}.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                Substitutes per Team
+              </label>
+              <input
+                type="number"
+                min="0"
+                max="10"
+                value={substituteCount}
+                disabled
+                className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-500 cursor-not-allowed"
+              />
+              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">
+                Substitute count cannot be changed after tournament creation. Each team can have up to {substituteCount} substitute{substituteCount !== '1' ? 's' : ''}.
               </p>
             </div>
 

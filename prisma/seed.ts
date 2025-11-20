@@ -61,7 +61,25 @@ async function main() {
     },
   })
 
-  console.log('Created bowling alleys')
+  const pinPalace = await prisma.bowling.create({
+    data: {
+      name: 'Pin Palace',
+    },
+  })
+
+  const spareTime = await prisma.bowling.create({
+    data: {
+      name: 'Spare Time Bowl',
+    },
+  })
+
+  const galaxyBowl = await prisma.bowling.create({
+    data: {
+      name: 'Galaxy Bowling Center',
+    },
+  })
+
+  console.log('Created 5 bowling alleys')
 
   // Create lanes for Strike Zone (18 lanes with opponent pairs)
   const lanes = []
@@ -143,13 +161,25 @@ async function main() {
 
   const players = []
   for (let i = 0; i < playerNames.length; i++) {
+    // Generate handicap based on skill level
+    const handicapBySkill = {
+      beginner: Math.floor(Math.random() * 20) + 30, // 30-50
+      intermediate: Math.floor(Math.random() * 15) + 15, // 15-30
+      advanced: Math.floor(Math.random() * 10) + 5, // 5-15
+    }
+
     const player = await prisma.player.create({
-      data: { name: playerNames[i] },
+      data: {
+        name: playerNames[i],
+        email: `${playerNames[i].toLowerCase().replace(' ', '.')}@example.com`,
+        phone: `555-${String(1000 + i).padStart(4, '0')}`,
+        initialHandicap: handicapBySkill[skillLevels[i]],
+      },
     })
     players.push({ ...player, skillLevel: skillLevels[i] })
   }
 
-  console.log('Created 72 players with varying skill levels')
+  console.log('Created 72 players with contact info and varying skill levels')
 
   // Create 18 teams for Fall Championship
   const teams = []
@@ -275,10 +305,10 @@ async function main() {
 
   console.log('Seed completed successfully!')
   console.log('Created:')
-  console.log('- 2 bowling alleys')
+  console.log('- 5 bowling alleys')
   console.log('- 18 lanes (9 pairs)')
   console.log('- 2 tournaments')
-  console.log('- 72 players (varying skill levels)')
+  console.log('- 72 players with email, phone, and initial handicap')
   console.log('- 18 teams')
   console.log('- 5 sessions (3 with scores, 2 upcoming)')
   console.log('- ~10% absence rate for realistic data')

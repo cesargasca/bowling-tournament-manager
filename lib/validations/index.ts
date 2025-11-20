@@ -14,12 +14,14 @@ export const createTournamentSchema = z.object({
   name: z.string().min(1, 'Name is required').max(255, 'Name is too long'),
   bowlingId: z.number().int().positive('Bowling alley is required'),
   teamSize: z.number().int().min(1, 'Team size must be at least 1').max(10, 'Team size cannot exceed 10').default(4),
+  substituteCount: z.number().int().min(0, 'Substitute count cannot be negative').max(10, 'Substitute count cannot exceed 10').default(0),
 })
 
 export const updateTournamentSchema = z.object({
   name: z.string().min(1, 'Name is required').max(255, 'Name is too long').optional(),
   bowlingId: z.number().int().positive('Bowling alley is required').optional(),
   teamSize: z.number().int().min(1, 'Team size must be at least 1').max(10, 'Team size cannot exceed 10').optional(),
+  substituteCount: z.number().int().min(0, 'Substitute count cannot be negative').max(10, 'Substitute count cannot exceed 10').optional(),
 })
 
 // Team validations
