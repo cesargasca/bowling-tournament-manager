@@ -104,7 +104,6 @@ export default function TournamentDetailPage() {
 
   // CSV import state
   const [csvFile, setCsvFile] = useState<File | null>(null);
-  const [csvYear, setCsvYear] = useState('');
   const [uploadingCsv, setUploadingCsv] = useState(false);
   const [csvError, setCsvError] = useState<string | null>(null);
   const [csvSuccess, setCsvSuccess] = useState<string | null>(null);
@@ -484,9 +483,6 @@ export default function TournamentDetailPage() {
     try {
       const formData = new FormData();
       formData.append('file', csvFile);
-      if (csvYear) {
-        formData.append('year', csvYear);
-      }
 
       const response = await fetch(`/api/tournaments/${tournamentId}/import-session-csv`, {
         method: 'POST',
@@ -498,7 +494,6 @@ export default function TournamentDetailPage() {
       if (result.success) {
         setCsvSuccess(result.data.message);
         setCsvFile(null);
-        setCsvYear('');
         fetchTournamentDetails();
 
         // Show detailed results if there are errors
@@ -1372,26 +1367,7 @@ export default function TournamentDetailPage() {
                         disabled={uploadingCsv}
                       />
                       <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                        CSV format: Session,Date,Lane1,Lane2,Lane3,... (Lane numbers match your bowling alley configuration)
-                      </p>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-                        Year (optional)
-                      </label>
-                      <input
-                        type="number"
-                        value={csvYear}
-                        onChange={(e) => setCsvYear(e.target.value)}
-                        placeholder={new Date().getFullYear().toString()}
-                        min="2000"
-                        max="2100"
-                        className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50"
-                        disabled={uploadingCsv}
-                      />
-                      <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                        Specify the year for date parsing. Defaults to current year if not provided.
+                        CSV format: Session,Date,Year,Lane1,Lane2,Lane3,... (Lane numbers match your bowling alley configuration)
                       </p>
                     </div>
 

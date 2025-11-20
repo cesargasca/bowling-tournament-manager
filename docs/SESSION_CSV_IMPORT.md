@@ -7,9 +7,10 @@ This feature allows you to import tournament session schedules from a CSV file, 
 The CSV file must have the following structure:
 
 ```csv
-Session,Date,Lane1,Lane2,Lane3,Lane4,...
-1a,Nov 11,TEAM1,TEAM2,TEAM3,TEAM4,...
-2a,Nov 18,TEAM5,TEAM6,TEAM7,TEAM8,...
+Session,Date,Year,Lane1,Lane2,Lane3,Lane4,...
+1a,Nov 11,2025,TEAM1,TEAM2,TEAM3,TEAM4,...
+2a,Nov 18,2025,TEAM5,TEAM6,TEAM7,TEAM8,...
+8a,Jan 20,2026,TEAM1,TEAM2,TEAM3,TEAM4,...
 ```
 
 **The lane numbers in your CSV should match your bowling alley's lane configuration.** The parser automatically detects lane columns, so you can use any lane numbering scheme.
@@ -18,27 +19,31 @@ Session,Date,Lane1,Lane2,Lane3,Lane4,...
 
 **Standard bowling alley (lanes 1-20):**
 ```csv
-Session,Date,Lane1,Lane2,Lane3,Lane4,...,Lane20
-1a,Nov 11,TEAM1,TEAM2,TEAM3,TEAM4,...,TEAM20
+Session,Date,Year,Lane1,Lane2,Lane3,Lane4,...,Lane20
+1a,Nov 11,2025,TEAM1,TEAM2,TEAM3,TEAM4,...,TEAM20
+2a,Jan 20,2026,TEAM1,TEAM2,TEAM3,TEAM4,...,TEAM20
 ```
 
 **Bol Insurgentes (lanes 17-34):**
 ```csv
-Session,Date,Lane17,Lane18,Lane19,Lane20,...,Lane34
-1a,Nov 11,TEAM1,TEAM2,TEAM3,TEAM4,...,TEAM18
+Session,Date,Year,Lane17,Lane18,Lane19,Lane20,...,Lane34
+1a,Nov 11,2025,TEAM1,TEAM2,TEAM3,TEAM4,...,TEAM18
+8a,Jan 20,2026,TEAM1,TEAM2,TEAM3,TEAM4,...,TEAM18
 ```
 
 **Custom configuration (lanes 5-14):**
 ```csv
-Session,Date,Lane5,Lane6,Lane7,Lane8,...,Lane14
-1a,Nov 11,TEAM1,TEAM2,TEAM3,TEAM4,...,TEAM10
+Session,Date,Year,Lane5,Lane6,Lane7,Lane8,...,Lane14
+1a,Nov 11,2025,TEAM1,TEAM2,TEAM3,TEAM4,...,TEAM10
+8a,Jan 20,2026,TEAM1,TEAM2,TEAM3,TEAM4,...,TEAM10
 ```
 
 ### Columns:
 
 1. **Session**: Session identifier (e.g., "1a", "2a", "3a")
 2. **Date**: Session date in format "Month Day" (e.g., "Nov 11", "Jan 20")
-3. **Lane{N}**: Team names assigned to each lane. Column names must follow the pattern `Lane{number}` (e.g., Lane1, Lane17, Lane25)
+3. **Year**: Four-digit year for the session (e.g., "2025", "2026")
+4. **Lane{N}**: Team names assigned to each lane. Column names must follow the pattern `Lane{number}` (e.g., Lane1, Lane17, Lane25)
 
 ### Requirements:
 
@@ -100,8 +105,7 @@ The interface will show success messages and any errors or warnings from the imp
 ```
 Content-Type: multipart/form-data
 
-file: CSV file
-year: (optional) Tournament year for date parsing (defaults to current year)
+file: CSV file (must include Session, Date, Year columns)
 ```
 
 ### Example using curl:
@@ -109,8 +113,7 @@ year: (optional) Tournament year for date parsing (defaults to current year)
 ```bash
 curl -X POST \
   http://localhost:3000/api/tournaments/1/import-session-csv \
-  -F "file=@session-schedule.csv" \
-  -F "year=2024"
+  -F "file=@session-schedule.csv"
 ```
 
 ### Example using JavaScript:
@@ -118,7 +121,6 @@ curl -X POST \
 ```javascript
 const formData = new FormData()
 formData.append('file', csvFile)
-formData.append('year', '2024')
 
 const response = await fetch('/api/tournaments/1/import-session-csv', {
   method: 'POST',
@@ -178,9 +180,7 @@ You can download this template and modify it with your tournament's schedule.
 1. **Flexible Lane Configuration**: The CSV parser automatically detects lane columns from your CSV headers. Use whatever lane numbering matches your bowling alley (lanes 1-20, 17-34, 5-14, etc.)
 2. **Team Names**: Must match exactly (case-insensitive) with teams in the database
 3. **Date Format**: Supports abbreviated and full month names (e.g., "Nov" or "November")
-4. **Year Handling**:
-   - If sessions span multiple years (e.g., Nov-Feb), provide the starting year
-   - Dates will automatically roll over to the next year when appropriate
+4. **Year Column Required**: Each row must include a year (2000-2100). This allows sessions to span multiple years (e.g., Nov 2025, Jan 2026)
 5. **Empty Lanes**: Lanes can be left empty (BYE) if a team has no opponent
 6. **Transaction Safety**: All sessions are created in a single database transaction
 7. **Error Handling**: Partial failures are reported but don't stop the entire import

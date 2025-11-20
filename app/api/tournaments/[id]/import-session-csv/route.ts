@@ -6,6 +6,7 @@ import { successResponse, handleApiError, errorResponse } from '@/lib/utils/api'
 interface SessionRow {
   session: string
   date: string
+  year: number
   laneAssignments: Record<string, string> // laneNumber -> teamName
 }
 
@@ -16,8 +17,8 @@ interface ParsedCSVData {
 /**
  * Parse session CSV data
  * Expected format:
- * Session,Date,Lane1,Lane2,Lane3,...
- * 1a,Nov 11,TEAM1,TEAM2,TEAM3,...
+ * Session,Date,Year,Lane1,Lane2,Lane3,...
+ * 1a,Nov 11,2025,TEAM1,TEAM2,TEAM3,...
  *
  * The parser dynamically detects lane columns from CSV headers.
  * Lane columns must follow the pattern: Lane{number} (e.g., Lane1, Lane17, Lane25)
@@ -55,9 +56,15 @@ function parseSessionCSV(csvContent: string): ParsedCSVData {
   for (const record of records) {
     const session = record.Session || record.session
     const date = record.Date || record.date
+    const yearStr = record.Year || record.year
 
-    if (!session || !date) {
-      throw new Error(`Missing session or date in row: ${JSON.stringify(record)}`)
+    if (!session || !date || !yearStr) {
+      throw new Error(`Missing session, date, or year in row: ${JSON.stringify(record)}`)
+    }
+
+    const year = parseInt(yearStr, 10)
+    if (isNaN(year) || year < 2000 || year > 2100) {
+      throw new Error(`Invalid year "${yearStr}" in session ${session}. Year must be between 2000 and 2100.`)
     }
 
     const laneAssignments: Record<string, string> = {}
@@ -74,6 +81,7 @@ function parseSessionCSV(csvContent: string): ParsedCSVData {
     sessions.push({
       session,
       date,
+      year,
       laneAssignments,
     })
   }
@@ -82,10 +90,9 @@ function parseSessionCSV(csvContent: string): ParsedCSVData {
 }
 
 /**
- * Parse date string (e.g., "Nov 11", "Jan 20") into a Date object
- * Uses the tournament's year context or current year
+ * Parse date string (e.g., "Nov 11", "Jan 20") into a Date object with the specified year
  */
-function parseSessionDate(dateStr: string, baseYear?: number): Date {
+function parseSessionDate(dateStr: string, year: number): Date {
   const monthMap: Record<string, number> = {
     jan: 0, january: 0,
     feb: 1, february: 1,
@@ -118,9 +125,6 @@ function parseSessionDate(dateStr: string, baseYear?: number): Date {
     throw new Error(`Invalid day: ${parts[1]}`)
   }
 
-  // Use provided year or current year
-  const year = baseYear || new Date().getFullYear()
-
   return new Date(year, month, day)
 }
 
@@ -149,7 +153,6 @@ export async function POST(
     // Get form data
     const formData = await request.formData()
     const file = formData.get('file') as File
-    const yearStr = formData.get('year') as string | null
 
     if (!file) {
       return errorResponse('No file provided', 400)
@@ -177,12 +180,6 @@ export async function POST(
       return errorResponse('No sessions found in CSV', 400)
     }
 
-    // Parse year if provided
-    const baseYear = yearStr ? parseInt(yearStr, 10) : undefined
-    if (yearStr && (isNaN(baseYear!) || baseYear! < 2000 || baseYear! > 2100)) {
-      return errorResponse('Invalid year provided', 400)
-    }
-
     // Get all teams for this tournament
     const teams = await prisma.team.findMany({
       where: { tournamentId },
@@ -205,10 +202,10 @@ export async function POST(
 
       for (const sessionRow of parsedData.sessions) {
         try {
-          // Parse date
+          // Parse date with year from CSV
           let sessionDate: Date
           try {
-            sessionDate = parseSessionDate(sessionRow.date, baseYear)
+            sessionDate = parseSessionDate(sessionRow.date, sessionRow.year)
           } catch (dateError) {
             errors.push({
               session: sessionRow.session,
