@@ -149,6 +149,32 @@ export async function GET(
     // Initialize player statistics
     const playerStats: Map<number, PlayerStanding> = new Map();
 
+    // First, add ALL players from teams (even if they haven't played any sessions yet)
+    for (const team of tournament.teams) {
+      for (const teamPlayer of team.teamPlayers) {
+        const playerId = teamPlayer.playerId;
+        const playerName = teamPlayer.player.name;
+        const teamName = team.name;
+        const categoryInfo = playerCategoryMap.get(playerId);
+
+        playerStats.set(playerId, {
+          playerId,
+          playerName,
+          teamName,
+          categoryId: categoryInfo?.categoryId || null,
+          categoryName: categoryInfo?.categoryName || null,
+          isManualCategory: categoryInfo?.isManual || false,
+          gamesPlayed: 0,
+          totalPins: 0,
+          average: 0,
+          highGame: 0,
+          lowGame: 999,
+          attendanceRate: 0,
+          paymentRate: 0,
+        });
+      }
+    }
+
     // Calculate team standings from session results
     for (const session of tournament.sessions) {
       // Process each matchup in the session
@@ -205,29 +231,10 @@ export async function GET(
           const allPlayerSessions = [...teamAPlayerSessions, ...teamBPlayerSessions];
           for (const tps of allPlayerSessions) {
             const playerId = tps.teamPlayer.playerId;
-            const playerName = tps.teamPlayer.player.name;
-            const teamName = tps.teamPlayer.team.name;
 
-            if (!playerStats.has(playerId)) {
-              const categoryInfo = playerCategoryMap.get(playerId);
-              playerStats.set(playerId, {
-                playerId,
-                playerName,
-                teamName,
-                categoryId: categoryInfo?.categoryId || null,
-                categoryName: categoryInfo?.categoryName || null,
-                isManualCategory: categoryInfo?.isManual || false,
-                gamesPlayed: 0,
-                totalPins: 0,
-                average: 0,
-                highGame: 0,
-                lowGame: 999,
-                attendanceRate: 0,
-                paymentRate: 0,
-              });
-            }
-
-            const stats = playerStats.get(playerId)!;
+            // Get existing player stats (should already exist from initialization)
+            const stats = playerStats.get(playerId);
+            if (!stats) continue; // Skip if player not found (shouldn't happen)
 
             // Only count if player actually played (not absent with 0,0,0)
             const totalScore = tps.line1 + tps.line2 + tps.line3;

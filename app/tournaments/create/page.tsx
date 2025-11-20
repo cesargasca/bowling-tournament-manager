@@ -164,60 +164,56 @@ export default function CreateTournamentPage() {
       return;
     }
 
-    if (csvData.length === 0) {
-      setError('Please upload a CSV file with teams and players');
-      return;
-    }
-
     setLoading(true);
     setError(null);
 
     try {
-      // Step 1: Create tournament
-      const tournamentResponse = await fetch('/api/tournaments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: tournamentName,
-          bowlingId: parseInt(selectedBowlingId),
-          teamSize: parseInt(teamSize),
-          substituteCount: parseInt(substituteCount),
-        }),
-      });
+      // If CSV data is provided, import as part of tournament creation
+      if (csvData.length > 0) {
+        const response = await fetch('/api/tournaments/import-csv', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tournamentName,
+            bowlingId: parseInt(selectedBowlingId),
+            teamSize: parseInt(teamSize),
+            substituteCount: parseInt(substituteCount),
+            csvData,
+          }),
+        });
 
-      const tournamentResult = await tournamentResponse.json();
+        const result = await response.json();
 
-      if (!tournamentResult.success) {
-        throw new Error(tournamentResult.error || 'Failed to create tournament');
+        if (!result.success) {
+          setError(result.error || 'Failed to create tournament with CSV import');
+          return;
+        }
+
+        // Success - redirect to tournament
+        router.push(`/tournaments/${result.data.tournamentId}`);
+      } else {
+        // Create tournament without CSV import
+        const response = await fetch('/api/tournaments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: tournamentName,
+            bowlingId: parseInt(selectedBowlingId),
+            teamSize: parseInt(teamSize),
+            substituteCount: parseInt(substituteCount),
+          }),
+        });
+
+        const result = await response.json();
+
+        if (!result.success) {
+          setError(result.error || 'Failed to create tournament');
+          return;
+        }
+
+        // Success - redirect to tournament
+        router.push(`/tournaments/${result.data.id}`);
       }
-
-      const tournamentId = tournamentResult.data.id;
-
-      // Step 2: Import CSV
-      const importResponse = await fetch('/api/tournaments/import-csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tournamentId,
-          csvData,
-        }),
-      });
-
-      const importResult = await importResponse.json();
-
-      if (!importResult.success) {
-        // Tournament was created but import failed
-        setError(
-          `Tournament created but CSV import failed: ${importResult.error}. You can manually add teams or try importing again from the tournament page.`
-        );
-        setTimeout(() => {
-          router.push(`/tournaments/${tournamentId}`);
-        }, 3000);
-        return;
-      }
-
-      // Success!
-      router.push(`/tournaments/${tournamentId}`);
     } catch (err: any) {
       setError(err.message || 'Failed to create tournament');
     } finally {
@@ -294,63 +290,96 @@ export default function CreateTournamentPage() {
                 </select>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-                  Team Size (players per team) *
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="10"
-                  value={teamSize}
-                  onChange={(e) => setTeamSize(e.target.value)}
-                  className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50"
-                  required
-                />
-                <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">
-                  Each team in this tournament will require exactly {teamSize} player{teamSize !== '1' ? 's' : ''}. This cannot be changed later.
-                </p>
-              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                    Regular Players per Team *
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setTeamSize(Math.max(1, parseInt(teamSize) - 1).toString())}
+                      className="w-10 h-10 flex items-center justify-center bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-50 rounded-lg hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-colors"
+                    >
+                      −
+                    </button>
+                    <input
+                      type="number"
+                      min="1"
+                      max="10"
+                      value={teamSize}
+                      onChange={(e) => setTeamSize(e.target.value)}
+                      className="flex-1 px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50 text-center text-lg font-semibold"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setTeamSize(Math.min(10, parseInt(teamSize) + 1).toString())}
+                      className="w-10 h-10 flex items-center justify-center bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-50 rounded-lg hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-colors"
+                    >
+                      +
+                    </button>
+                  </div>
+                  <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-500">
+                    Expected number of regular players per team. Teams can have different amounts - warnings will be shown if they don't match.
+                  </p>
+                </div>
 
-              <div>
-                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-                  Substitutes per Team
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  max="10"
-                  value={substituteCount}
-                  onChange={(e) => setSubstituteCount(e.target.value)}
-                  className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50"
-                />
-                <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">
-                  Number of substitute players allowed per team (0-{substituteCount}). Mark substitutes with "S" or "Substitute" in the CSV Substitute column.
-                </p>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                    Substitutes per Team
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setSubstituteCount(Math.max(0, parseInt(substituteCount) - 1).toString())}
+                      className="w-10 h-10 flex items-center justify-center bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-50 rounded-lg hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-colors"
+                    >
+                      −
+                    </button>
+                    <input
+                      type="number"
+                      min="0"
+                      max="10"
+                      value={substituteCount}
+                      onChange={(e) => setSubstituteCount(e.target.value)}
+                      className="flex-1 px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50 text-center text-lg font-semibold"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setSubstituteCount(Math.min(10, parseInt(substituteCount) + 1).toString())}
+                      className="w-10 h-10 flex items-center justify-center bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-50 rounded-lg hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-colors"
+                    >
+                      +
+                    </button>
+                  </div>
+                  <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-500">
+                    Expected number of substitutes. Mark substitutes with "S", "Substitute", or "Yes" in the CSV. Teams can have more - warnings will be shown.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* CSV Import (Required) */}
+          {/* CSV Import (Optional) */}
           <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6">
             <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50 mb-2">
-              Import Teams and Players *
+              Import Teams and Players (Optional)
             </h2>
             <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-6">
-              Upload a CSV file with your teams and players. Players must be assigned to teams.
+              Upload a CSV file to create teams and players all at once, or skip this step and add them manually later.
             </p>
 
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-                  CSV File *
+                  CSV File
                 </label>
                 <input
                   type="file"
                   accept=".csv"
                   onChange={handleFileChange}
                   className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50"
-                  required
                 />
                 <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-500">
                   Required columns: Team Name, Player Name<br />
@@ -424,10 +453,10 @@ Team 3,Group B,Max Extra,,,18,B League,Yes`}
             </button>
             <button
               type="submit"
-              disabled={loading || !tournamentName.trim() || !selectedBowlingId || csvData.length === 0}
+              disabled={loading || !tournamentName.trim() || !selectedBowlingId}
               className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Creating Tournament...' : 'Create Tournament'}
+              {loading ? 'Creating Tournament...' : (csvData.length > 0 ? 'Create Tournament & Import CSV' : 'Create Tournament')}
             </button>
           </div>
         </form>

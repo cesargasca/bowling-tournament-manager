@@ -21,6 +21,8 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             name: true,
+            teamSize: true,
+            substituteCount: true,
           },
         },
         teamPlayers: {
@@ -36,7 +38,36 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    return successResponse(teams)
+    // Add warnings for each team
+    const teamsWithWarnings = teams.map((team) => {
+      const warnings: string[] = []
+      const regularPlayers = team.teamPlayers.filter(tp => !tp.isReplacement)
+      const substitutes = team.teamPlayers.filter(tp => tp.isReplacement)
+      const regularPlayerCount = regularPlayers.length
+      const substituteCount = substitutes.length
+      const expectedPlayerCount = team.tournament.teamSize
+      const expectedSubstituteCount = team.tournament.substituteCount || 0
+
+      if (regularPlayerCount > expectedPlayerCount) {
+        warnings.push(
+          `Team has ${regularPlayerCount} regular players, which is more than the expected ${expectedPlayerCount}.`
+        )
+      } else if (regularPlayerCount < expectedPlayerCount) {
+        warnings.push(
+          `Team has ${regularPlayerCount} regular players, which is less than the expected ${expectedPlayerCount}.`
+        )
+      }
+
+      if (substituteCount > expectedSubstituteCount) {
+        warnings.push(
+          `Team has ${substituteCount} substitutes, which is more than the expected ${expectedSubstituteCount}.`
+        )
+      }
+
+      return { ...team, warnings }
+    })
+
+    return successResponse(teamsWithWarnings)
   } catch (error) {
     return handleApiError(error)
   }
@@ -52,23 +83,6 @@ export async function POST(request: NextRequest) {
 
     // Create team with team players in a transaction
     const team = await prisma.$transaction(async (tx) => {
-      // Get tournament to check team size requirement
-      const tournament = await tx.tournament.findUnique({
-        where: { id: teamData.tournamentId },
-        select: { teamSize: true, name: true },
-      })
-
-      if (!tournament) {
-        throw new Error('Tournament not found')
-      }
-
-      // Validate team size matches tournament requirement
-      if (playerIds.length !== tournament.teamSize) {
-        throw new Error(
-          `Team must have exactly ${tournament.teamSize} player${tournament.teamSize !== 1 ? 's' : ''} for this tournament`
-        )
-      }
-
       // Check if any player is already in another team in this tournament
       const existingTeamPlayers = await tx.teamPlayer.findMany({
         where: {

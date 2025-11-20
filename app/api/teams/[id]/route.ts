@@ -18,6 +18,7 @@ export async function GET(
             id: true,
             name: true,
             teamSize: true,
+            substituteCount: true,
           },
         },
         group: {
@@ -43,7 +44,32 @@ export async function GET(
       return errorResponse('Team not found', 404)
     }
 
-    return successResponse(team)
+    // Add warnings for player count mismatches
+    const warnings: string[] = []
+    const regularPlayers = team.teamPlayers.filter(tp => !tp.isReplacement)
+    const substitutes = team.teamPlayers.filter(tp => tp.isReplacement)
+    const regularPlayerCount = regularPlayers.length
+    const substituteCount = substitutes.length
+    const expectedPlayerCount = team.tournament.teamSize
+    const expectedSubstituteCount = team.tournament.substituteCount
+
+    if (regularPlayerCount > expectedPlayerCount) {
+      warnings.push(
+        `Team has ${regularPlayerCount} regular players, which is more than the expected ${expectedPlayerCount}.`
+      )
+    } else if (regularPlayerCount < expectedPlayerCount) {
+      warnings.push(
+        `Team has ${regularPlayerCount} regular players, which is less than the expected ${expectedPlayerCount}.`
+      )
+    }
+
+    if (substituteCount > expectedSubstituteCount) {
+      warnings.push(
+        `Team has ${substituteCount} substitutes, which is more than the expected ${expectedSubstituteCount}.`
+      )
+    }
+
+    return successResponse({ ...team, warnings })
   } catch (error) {
     return handleApiError(error)
   }
@@ -83,13 +109,6 @@ export async function PUT(
 
       // If playerIds are provided, update team players
       if (playerIds !== undefined) {
-        // Validate team size matches tournament requirement
-        if (playerIds.length !== currentTeam.tournament.teamSize) {
-          throw new Error(
-            `Team must have exactly ${currentTeam.tournament.teamSize} player${currentTeam.tournament.teamSize !== 1 ? 's' : ''} for this tournament`
-          )
-        }
-
         // Check if any of the new players are in other teams in this tournament
         if (playerIds.length > 0) {
           const existingTeamPlayers = await tx.teamPlayer.findMany({

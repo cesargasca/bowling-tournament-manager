@@ -13,6 +13,7 @@ interface Team {
     id: number;
     name: string;
     teamSize: number;
+    substituteCount: number;
   };
   group: {
     id: number;
@@ -27,6 +28,7 @@ interface Team {
       name: string;
     };
   }>;
+  warnings?: string[];
 }
 
 interface Player {
@@ -47,10 +49,11 @@ export default function TeamDetailPage() {
 
   // Form states
   const [teamName, setTeamName] = useState('');
-  const [selectedPlayerIds, setSelectedPlayerIds] = useState<number[]>([]);
   const [availablePlayers, setAvailablePlayers] = useState<Player[]>([]);
   const [saving, setSaving] = useState(false);
-  const [playerSearchQuery, setPlayerSearchQuery] = useState('');
+  const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
+  const [isSubstitute, setIsSubstitute] = useState(false);
+  const [removingPlayerId, setRemovingPlayerId] = useState<number | null>(null);
 
   useEffect(() => {
     fetchTeamDetails();
@@ -59,10 +62,9 @@ export default function TeamDetailPage() {
 
   useEffect(() => {
     if (team && allPlayers.length > 0) {
-      // Filter out players already in the team and players in other teams in this tournament
       fetchAvailablePlayers();
     }
-  }, [team, allPlayers, isEditing]);
+  }, [team, allPlayers]);
 
   const fetchTeamDetails = async () => {
     try {
@@ -73,7 +75,6 @@ export default function TeamDetailPage() {
       if (result.success) {
         setTeam(result.data);
         setTeamName(result.data.name);
-        setSelectedPlayerIds(result.data.teamPlayers.map((tp: any) => tp.playerId));
       } else {
         setError(result.error || 'Failed to load team');
       }
@@ -121,7 +122,8 @@ export default function TeamDetailPage() {
 
         // Filter available players
         const available = allPlayers.filter(
-          (player) => !playerIdsInOtherTeams.has(player.id)
+          (player) => !playerIdsInOtherTeams.has(player.id) &&
+          !team.teamPlayers.some(tp => tp.playerId === player.id)
         );
 
         setAvailablePlayers(available);
@@ -131,16 +133,8 @@ export default function TeamDetailPage() {
     }
   };
 
-  const handleSave = async () => {
-    if (!team) return;
-
-    // Validate team size
-    if (selectedPlayerIds.length !== team.tournament.teamSize) {
-      setError(
-        `Team must have exactly ${team.tournament.teamSize} player${team.tournament.teamSize !== 1 ? 's' : ''} for this tournament`
-      );
-      return;
-    }
+  const handleUpdateTeamName = async () => {
+    if (!team || teamName.trim() === '') return;
 
     try {
       setSaving(true);
@@ -151,7 +145,6 @@ export default function TeamDetailPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: teamName,
-          playerIds: selectedPlayerIds,
         }),
       });
 
@@ -161,7 +154,7 @@ export default function TeamDetailPage() {
         setTeam(result.data);
         setIsEditing(false);
       } else {
-        setError(result.error || 'Failed to update team');
+        setError(result.error || 'Failed to update team name');
       }
     } catch (err) {
       setError('Network error - failed to update team');
@@ -171,22 +164,75 @@ export default function TeamDetailPage() {
     }
   };
 
+  const handleAddPlayer = async () => {
+    if (!team || !selectedPlayerId) return;
+
+    try {
+      setSaving(true);
+      setError(null);
+
+      const response = await fetch(`/api/teams/${teamId}/players`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          addPlayers: [{ playerId: selectedPlayerId, isReplacement: isSubstitute }],
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setTeam(result.data);
+        setSelectedPlayerId(null);
+        setIsSubstitute(false);
+        await fetchAvailablePlayers();
+      } else {
+        setError(result.error || 'Failed to add player');
+      }
+    } catch (err) {
+      setError('Network error - failed to add player');
+      console.error(err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRemovePlayer = async (playerId: number) => {
+    if (!team) return;
+
+    try {
+      setRemovingPlayerId(playerId);
+      setError(null);
+
+      const response = await fetch(`/api/teams/${teamId}/players`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          removePlayerIds: [playerId],
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setTeam(result.data);
+        await fetchAvailablePlayers();
+      } else {
+        setError(result.error || 'Failed to remove player');
+      }
+    } catch (err) {
+      setError('Network error - failed to remove player');
+      console.error(err);
+    } finally {
+      setRemovingPlayerId(null);
+    }
+  };
+
   const handleCancel = () => {
     if (!team) return;
     setTeamName(team.name);
-    setSelectedPlayerIds(team.teamPlayers.map((tp) => tp.playerId));
     setIsEditing(false);
     setError(null);
-  };
-
-  const handlePlayerToggle = (playerId: number) => {
-    setSelectedPlayerIds((prev) => {
-      if (prev.includes(playerId)) {
-        return prev.filter((id) => id !== playerId);
-      } else {
-        return [...prev, playerId];
-      }
-    });
   };
 
   if (loading) {
@@ -218,6 +264,9 @@ export default function TeamDetailPage() {
 
   if (!team) return null;
 
+  const regularPlayers = team.teamPlayers.filter(tp => !tp.isReplacement);
+  const substitutes = team.teamPlayers.filter(tp => tp.isReplacement);
+
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
       {/* Header */}
@@ -243,7 +292,7 @@ export default function TeamDetailPage() {
                 onClick={() => setIsEditing(true)}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
-                Edit Team
+                Edit Team Name
               </button>
             </div>
           ) : (
@@ -259,6 +308,22 @@ export default function TeamDetailPage() {
                 {team.tournament.name}
                 {team.group && ` • ${team.group.name}`}
               </p>
+              <div className="mt-4 flex items-center gap-3">
+                <button
+                  onClick={handleUpdateTeamName}
+                  disabled={saving || teamName.trim() === ''}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {saving ? 'Saving...' : 'Save'}
+                </button>
+                <button
+                  onClick={handleCancel}
+                  disabled={saving}
+                  className="px-4 py-2 bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-50 rounded-lg hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -272,36 +337,41 @@ export default function TeamDetailPage() {
           </div>
         )}
 
-        {/* Team Members */}
-        <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
-          <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
-            <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">Team Members</h2>
-            <span
-              className={`text-sm font-medium ${
-                selectedPlayerIds.length === team.tournament.teamSize
-                  ? 'text-green-600 dark:text-green-400'
-                  : 'text-orange-600 dark:text-orange-400'
-              }`}
-            >
-              {selectedPlayerIds.length} / {team.tournament.teamSize} player
-              {team.tournament.teamSize !== 1 ? 's' : ''}
-            </span>
+        {/* Warnings */}
+        {team.warnings && team.warnings.length > 0 && (
+          <div className="mb-6 p-4 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
+            <h3 className="text-orange-900 dark:text-orange-100 font-semibold mb-2">Warnings:</h3>
+            <ul className="list-disc list-inside text-orange-800 dark:text-orange-200 space-y-1">
+              {team.warnings.map((warning, idx) => (
+                <li key={idx}>{warning}</li>
+              ))}
+            </ul>
           </div>
+        )}
 
-          {!isEditing ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Regular Players */}
+          <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+            <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">Regular Players</h2>
+              <span
+                className={`text-sm font-medium ${
+                  regularPlayers.length === team.tournament.teamSize
+                    ? 'text-green-600 dark:text-green-400'
+                    : 'text-orange-600 dark:text-orange-400'
+                }`}
+              >
+                {regularPlayers.length} / {team.tournament.teamSize} expected
+              </span>
+            </div>
+
             <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
-              {team.teamPlayers.length === 0 ? (
-                <div className="p-12 text-center">
-                  <p className="text-zinc-600 dark:text-zinc-400 text-lg">No players in this team</p>
-                  <button
-                    onClick={() => setIsEditing(true)}
-                    className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    Add Players
-                  </button>
+              {regularPlayers.length === 0 ? (
+                <div className="p-8 text-center">
+                  <p className="text-zinc-600 dark:text-zinc-400">No regular players</p>
                 </div>
               ) : (
-                team.teamPlayers.map((tp) => (
+                regularPlayers.map((tp) => (
                   <div
                     key={tp.id}
                     className="px-6 py-4 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors flex items-center justify-between"
@@ -312,113 +382,133 @@ export default function TeamDetailPage() {
                           {tp.player.name.charAt(0).toUpperCase()}
                         </span>
                       </div>
-                      <div>
-                        <button
-                          onClick={() => router.push(`/players/${tp.playerId}`)}
-                          className="text-zinc-900 dark:text-zinc-50 font-medium hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-left"
-                        >
-                          {tp.player.name}
-                        </button>
-                        {tp.isReplacement && (
-                          <span className="ml-2 text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-400 px-2 py-0.5 rounded">
-                            Replacement
-                          </span>
-                        )}
-                      </div>
+                      <button
+                        onClick={() => router.push(`/players/${tp.playerId}`)}
+                        className="text-zinc-900 dark:text-zinc-50 font-medium hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-left"
+                      >
+                        {tp.player.name}
+                      </button>
                     </div>
+                    <button
+                      onClick={() => handleRemovePlayer(tp.playerId)}
+                      disabled={removingPlayerId === tp.playerId}
+                      className="px-3 py-1.5 text-sm bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors disabled:opacity-50"
+                    >
+                      {removingPlayerId === tp.playerId ? 'Removing...' : 'Remove'}
+                    </button>
                   </div>
                 ))
               )}
             </div>
-          ) : (
-            <div className="p-6">
-              <div className="mb-4">
-                <div className="text-sm text-zinc-600 dark:text-zinc-400 mb-2">
-                  Select exactly <span className="font-semibold text-zinc-900 dark:text-zinc-50">{team.tournament.teamSize}</span> player
-                  {team.tournament.teamSize !== 1 ? 's' : ''} for this team. Players already in other teams in this tournament are not available.
+          </div>
+
+          {/* Substitutes */}
+          <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+            <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">Substitutes</h2>
+              <span
+                className={`text-sm font-medium ${
+                  substitutes.length === team.tournament.substituteCount
+                    ? 'text-green-600 dark:text-green-400'
+                    : 'text-orange-600 dark:text-orange-400'
+                }`}
+              >
+                {substitutes.length} / {team.tournament.substituteCount} expected
+              </span>
+            </div>
+
+            <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
+              {substitutes.length === 0 ? (
+                <div className="p-8 text-center">
+                  <p className="text-zinc-600 dark:text-zinc-400">No substitutes</p>
                 </div>
-                {selectedPlayerIds.length !== team.tournament.teamSize && (
-                  <div className="text-sm bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded px-3 py-2 text-orange-800 dark:text-orange-200">
-                    {selectedPlayerIds.length < team.tournament.teamSize
-                      ? `Select ${team.tournament.teamSize - selectedPlayerIds.length} more player${team.tournament.teamSize - selectedPlayerIds.length !== 1 ? 's' : ''}`
-                      : `Remove ${selectedPlayerIds.length - team.tournament.teamSize} player${selectedPlayerIds.length - team.tournament.teamSize !== 1 ? 's' : ''}`}
-                  </div>
-                )}
-              </div>
-
-              {/* Player Search */}
-              {availablePlayers.length > 0 && (
-                <div className="mb-3">
-                  <input
-                    type="text"
-                    value={playerSearchQuery}
-                    onChange={(e) => setPlayerSearchQuery(e.target.value)}
-                    placeholder="Search players..."
-                    className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50"
-                  />
-                </div>
-              )}
-
-              <div className="space-y-2 max-h-96 overflow-y-auto">
-                {(() => {
-                  // Filter players based on search query
-                  const filteredPlayers = availablePlayers.filter((player) =>
-                    player.name.toLowerCase().includes(playerSearchQuery.toLowerCase())
-                  );
-
-                  return filteredPlayers.length === 0 ? (
-                    <div className="p-8 text-center text-zinc-600 dark:text-zinc-400">
-                      {playerSearchQuery
-                        ? 'No players found matching your search'
-                        : 'No available players. All players are already assigned to teams in this tournament.'}
-                    </div>
-                  ) : (
-                    filteredPlayers.map((player) => (
-                      <label
-                        key={player.id}
-                        className="flex items-center gap-3 p-3 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer transition-colors"
+              ) : (
+                substitutes.map((tp) => (
+                  <div
+                    key={tp.id}
+                    className="px-6 py-4 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900 flex items-center justify-center">
+                        <span className="text-orange-600 dark:text-orange-400 font-semibold">
+                          {tp.player.name.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => router.push(`/players/${tp.playerId}`)}
+                        className="text-zinc-900 dark:text-zinc-50 font-medium hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-left"
                       >
-                        <input
-                          type="checkbox"
-                          checked={selectedPlayerIds.includes(player.id)}
-                          onChange={() => handlePlayerToggle(player.id)}
-                          className="w-4 h-4 rounded border-zinc-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500"
-                        />
-                        <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-                          <span className="text-blue-600 dark:text-blue-400 text-sm font-semibold">
-                            {player.name.charAt(0).toUpperCase()}
-                          </span>
-                        </div>
-                        <span className="text-zinc-900 dark:text-zinc-50">{player.name}</span>
-                      </label>
-                    ))
-                  );
-                })()}
-              </div>
+                        {tp.player.name}
+                      </button>
+                    </div>
+                    <button
+                      onClick={() => handleRemovePlayer(tp.playerId)}
+                      disabled={removingPlayerId === tp.playerId}
+                      className="px-3 py-1.5 text-sm bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors disabled:opacity-50"
+                    >
+                      {removingPlayerId === tp.playerId ? 'Removing...' : 'Remove'}
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
 
-              {/* Action Buttons */}
-              <div className="mt-6 flex items-center gap-3">
+        {/* Add Player Section */}
+        <div className="mt-6 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+          <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800">
+            <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">Add Player</h2>
+          </div>
+
+          <div className="p-6">
+            {availablePlayers.length === 0 ? (
+              <p className="text-zinc-600 dark:text-zinc-400">
+                No available players. All players are already assigned to teams in this tournament.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                    Select Player
+                  </label>
+                  <select
+                    value={selectedPlayerId || ''}
+                    onChange={(e) => setSelectedPlayerId(e.target.value ? parseInt(e.target.value) : null)}
+                    className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50"
+                  >
+                    <option value="">-- Select a player --</option>
+                    {availablePlayers.map((player) => (
+                      <option key={player.id} value={player.id}>
+                        {player.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="isSubstitute"
+                    checked={isSubstitute}
+                    onChange={(e) => setIsSubstitute(e.target.checked)}
+                    className="w-4 h-4 rounded border-zinc-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500"
+                  />
+                  <label htmlFor="isSubstitute" className="text-sm text-zinc-700 dark:text-zinc-300">
+                    Add as substitute
+                  </label>
+                </div>
+
                 <button
-                  onClick={handleSave}
-                  disabled={
-                    saving ||
-                    teamName.trim() === '' ||
-                    selectedPlayerIds.length !== team.tournament.teamSize
-                  }
+                  onClick={handleAddPlayer}
+                  disabled={!selectedPlayerId || saving}
                   className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {saving ? 'Saving...' : 'Save Changes'}
-                </button>
-                <button
-                  onClick={handleCancel}
-                  disabled={saving}
-                  className="px-6 py-2 bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-50 rounded-lg hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Cancel
+                  {saving ? 'Adding...' : 'Add Player'}
                 </button>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </div>

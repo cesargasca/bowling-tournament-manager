@@ -29,7 +29,7 @@ export const createTeamSchema = z.object({
   name: z.string().min(1, 'Name is required').max(255, 'Name is too long'),
   tournamentId: z.number().int().positive('Tournament is required'),
   laneId: z.number().int().positive().optional(),
-  playerIds: z.array(z.number().int().positive()).min(1, 'Team must have at least 1 player'),
+  playerIds: z.array(z.number().int().positive()).min(0, 'Team can have 0 or more players'),
 })
 
 export const updateTeamSchema = z.object({
