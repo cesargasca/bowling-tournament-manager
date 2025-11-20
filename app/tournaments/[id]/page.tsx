@@ -50,6 +50,8 @@ interface TournamentDetails {
       playerId: number;
       playerName: string;
       teamName: string;
+      teamPlayerId: number;
+      handicap: number;
       categoryId: number | null;
       isManualCategory: boolean;
       gamesPlayed: number;
@@ -289,6 +291,43 @@ export default function TournamentDetailPage() {
       }
     } catch (err) {
       console.error('Failed to move player:', err);
+    }
+  };
+
+  const updatePlayerHandicap = async (teamPlayerId: number, handicap: number) => {
+    try {
+      const response = await fetch(`/api/team-players/${teamPlayerId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ handicap }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        // Update local state to reflect the change immediately
+        if (data) {
+          setData({
+            ...data,
+            categorizedStandings: data.categorizedStandings.map(category => ({
+              ...category,
+              players: category.players.map(player =>
+                player.teamPlayerId === teamPlayerId
+                  ? { ...player, handicap }
+                  : player
+              ),
+            })),
+          });
+        }
+      } else {
+        console.error('Failed to update handicap:', result.error);
+        // Refresh to restore original value
+        fetchTournamentDetails();
+      }
+    } catch (err) {
+      console.error('Failed to update handicap:', err);
+      // Refresh to restore original value
+      fetchTournamentDetails();
     }
   };
 
@@ -1033,6 +1072,9 @@ export default function TournamentDetailPage() {
                           <th className="text-left py-3 px-6 text-zinc-700 dark:text-zinc-300 font-semibold">
                             Team
                           </th>
+                          <th className="text-center py-3 px-6 text-zinc-700 dark:text-zinc-300 font-semibold">
+                            Handicap
+                          </th>
                           {managementMode && (
                             <th className="text-left py-3 px-6 text-zinc-700 dark:text-zinc-300 font-semibold">
                               Move To
@@ -1091,7 +1133,7 @@ export default function TournamentDetailPage() {
                             </td>
                             <td className="py-4 px-6">
                               <button
-                                onClick={() => router.push(`/players/${player.playerId}`)}
+                                onClick={() => router.push(`/players/${player.playerId}?tournamentId=${tournamentId}`)}
                                 className="text-zinc-900 dark:text-zinc-50 font-medium hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-left"
                               >
                                 {player.playerName}
@@ -1104,6 +1146,16 @@ export default function TournamentDetailPage() {
                             </td>
                             <td className="py-4 px-6 text-zinc-600 dark:text-zinc-400">
                               {player.teamName}
+                            </td>
+                            <td className="py-4 px-6 text-center">
+                              <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                value={player.handicap}
+                                onChange={(e) => updatePlayerHandicap(player.teamPlayerId, parseInt(e.target.value) || 0)}
+                                className="w-16 px-2 py-1 text-center border border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50 font-semibold"
+                              />
                             </td>
                             {managementMode && (
                               <td className="py-4 px-6">

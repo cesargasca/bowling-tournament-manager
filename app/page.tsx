@@ -130,7 +130,7 @@ export default function AdminDashboard() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Overview Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           <StatCard
             title="Tournaments"
             value={data.overview.totalTournaments}
@@ -146,22 +146,11 @@ export default function AdminDashboard() {
             onClick={() => router.push('/players')}
           />
           <StatCard
-            title="Teams"
-            value={data.overview.totalTeams}
-            icon="🎳"
-            color="bg-purple-500"
-          />
-          <StatCard
-            title="Sessions"
-            value={data.overview.totalSessions}
-            icon="📅"
-            color="bg-orange-500"
-          />
-          <StatCard
             title="Bowling Alleys"
             value={data.overview.totalBowlingAlleys}
-            icon="🎯"
-            color="bg-pink-500"
+            icon="🎳"
+            color="bg-purple-500"
+            onClick={() => router.push('/bowling')}
           />
         </div>
 
@@ -246,76 +235,6 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Tournaments */}
-        <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6 mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
-              Active Tournaments
-              <span className="text-sm font-normal text-zinc-600 dark:text-zinc-400 ml-2">
-                (click to view details)
-              </span>
-            </h2>
-            <button
-              onClick={() => router.push('/tournaments/create')}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-            >
-              Create Tournament
-            </button>
-          </div>
-          {data.tournaments.length === 0 ? (
-            <p className="text-zinc-600 dark:text-zinc-400">No tournaments found</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-zinc-200 dark:border-zinc-800">
-                    <th className="text-left py-3 px-4 text-zinc-700 dark:text-zinc-300 font-semibold">
-                      Tournament
-                    </th>
-                    <th className="text-left py-3 px-4 text-zinc-700 dark:text-zinc-300 font-semibold">
-                      Bowling Alley
-                    </th>
-                    <th className="text-center py-3 px-4 text-zinc-700 dark:text-zinc-300 font-semibold">
-                      Teams
-                    </th>
-                    <th className="text-center py-3 px-4 text-zinc-700 dark:text-zinc-300 font-semibold">
-                      Players
-                    </th>
-                    <th className="text-center py-3 px-4 text-zinc-700 dark:text-zinc-300 font-semibold">
-                      Sessions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.tournaments.map((tournament) => (
-                    <tr
-                      key={tournament.id}
-                      onClick={() => router.push(`/tournaments/${tournament.id}`)}
-                      className="border-b border-zinc-100 dark:border-zinc-800 hover:bg-blue-50 dark:hover:bg-blue-950/20 transition-colors cursor-pointer"
-                    >
-                      <td className="py-3 px-4 text-blue-600 dark:text-blue-400 font-medium hover:text-blue-700 dark:hover:text-blue-300">
-                        {tournament.name}
-                      </td>
-                      <td className="py-3 px-4 text-zinc-600 dark:text-zinc-400">
-                        {tournament.bowlingAlley}
-                      </td>
-                      <td className="py-3 px-4 text-center text-zinc-900 dark:text-zinc-50">
-                        {tournament.teamsCount}
-                      </td>
-                      <td className="py-3 px-4 text-center text-zinc-900 dark:text-zinc-50">
-                        {tournament.playersCount}
-                      </td>
-                      <td className="py-3 px-4 text-center text-zinc-900 dark:text-zinc-50">
-                        {tournament.sessionsCount}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
         {/* Two Column Layout for Top Players and Payment Issues */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           {/* Top Players */}
@@ -395,57 +314,6 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Recent Sessions */}
-        <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6">
-          <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50 mb-4">
-            Recent Sessions
-          </h2>
-          {data.recentSessions.length === 0 ? (
-            <p className="text-zinc-600 dark:text-zinc-400">No sessions found</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-zinc-200 dark:border-zinc-800">
-                    <th className="text-left py-3 px-4 text-zinc-700 dark:text-zinc-300 font-semibold">
-                      Tournament
-                    </th>
-                    <th className="text-left py-3 px-4 text-zinc-700 dark:text-zinc-300 font-semibold">
-                      Bowling Alley
-                    </th>
-                    <th className="text-left py-3 px-4 text-zinc-700 dark:text-zinc-300 font-semibold">
-                      Date
-                    </th>
-                    <th className="text-center py-3 px-4 text-zinc-700 dark:text-zinc-300 font-semibold">
-                      Matchups
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.recentSessions.map((session) => (
-                    <tr
-                      key={session.id}
-                      className="border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
-                    >
-                      <td className="py-3 px-4 text-zinc-900 dark:text-zinc-50 font-medium">
-                        {session.tournament}
-                      </td>
-                      <td className="py-3 px-4 text-zinc-600 dark:text-zinc-400">
-                        {session.bowlingAlley}
-                      </td>
-                      <td className="py-3 px-4 text-zinc-600 dark:text-zinc-400">
-                        {new Date(session.sessionDate).toLocaleDateString()}
-                      </td>
-                      <td className="py-3 px-4 text-center text-zinc-900 dark:text-zinc-50">
-                        {session.matchupsCount} match{session.matchupsCount !== 1 ? 'es' : ''}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
       </div>
     </div>
   );
