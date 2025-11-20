@@ -43,7 +43,22 @@ export async function GET(
       return errorResponse('Team not found', 404)
     }
 
-    return successResponse(team)
+    // Add warnings for player count mismatches
+    const warnings: string[] = []
+    const playerCount = team.teamPlayers.length
+    const expectedPlayerCount = team.tournament.teamSize
+
+    if (playerCount > expectedPlayerCount) {
+      warnings.push(
+        `Team has ${playerCount} players, which is more than the expected ${expectedPlayerCount} players per team.`
+      )
+    } else if (playerCount < expectedPlayerCount) {
+      warnings.push(
+        `Team has ${playerCount} players, which is less than the expected ${expectedPlayerCount} players per team.`
+      )
+    }
+
+    return successResponse({ ...team, warnings })
   } catch (error) {
     return handleApiError(error)
   }
@@ -83,13 +98,6 @@ export async function PUT(
 
       // If playerIds are provided, update team players
       if (playerIds !== undefined) {
-        // Validate team size matches tournament requirement
-        if (playerIds.length !== currentTeam.tournament.teamSize) {
-          throw new Error(
-            `Team must have exactly ${currentTeam.tournament.teamSize} player${currentTeam.tournament.teamSize !== 1 ? 's' : ''} for this tournament`
-          )
-        }
-
         // Check if any of the new players are in other teams in this tournament
         if (playerIds.length > 0) {
           const existingTeamPlayers = await tx.teamPlayer.findMany({
