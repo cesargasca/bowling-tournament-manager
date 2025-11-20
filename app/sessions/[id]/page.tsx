@@ -315,6 +315,39 @@ export default function SessionDetailPage() {
     });
   };
 
+  const updateTotalScore = (
+    matchupId: number,
+    team: 'teamA' | 'teamB',
+    index: number,
+    total: number
+  ) => {
+    setMatchupScores((prev) => {
+      const updated = { ...prev };
+      if (!updated[matchupId]) {
+        updated[matchupId] = { teamA: [], teamB: [] };
+      }
+      const scores = [...updated[matchupId][team]];
+      const currentScore = scores[index];
+
+      // Distribute total evenly across three lines
+      const perLine = Math.floor(total / 3);
+      const remainder = total % 3;
+
+      scores[index] = {
+        ...currentScore,
+        line1: perLine + (remainder > 0 ? 1 : 0),
+        line2: perLine + (remainder > 1 ? 1 : 0),
+        line3: perLine,
+      };
+
+      updated[matchupId] = {
+        ...updated[matchupId],
+        [team]: scores,
+      };
+      return updated;
+    });
+  };
+
   const handleSaveScores = async () => {
     try {
       setSaving(true);
@@ -626,10 +659,22 @@ export default function SessionDetailPage() {
                                     className="w-16 px-2 py-1 text-center border border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50"
                                   />
                                 </td>
-                                <td className="py-2 px-2 text-center">
-                                  <span className="font-bold text-blue-600 dark:text-blue-400">
-                                    {score.line1 + score.line2 + score.line3}
-                                  </span>
+                                <td className="py-2 px-2">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max="900"
+                                    value={score.line1 + score.line2 + score.line3}
+                                    onChange={(e) =>
+                                      updateTotalScore(
+                                        matchup.id,
+                                        'teamA',
+                                        index,
+                                        parseInt(e.target.value) || 0
+                                      )
+                                    }
+                                    className="w-20 px-2 py-1 text-center border border-blue-300 dark:border-blue-700 rounded bg-blue-50 dark:bg-blue-950 text-blue-900 dark:text-blue-100 font-bold"
+                                  />
                                 </td>
                                 <td className="py-2 px-2">
                                   <input
@@ -774,10 +819,22 @@ export default function SessionDetailPage() {
                                     className="w-16 px-2 py-1 text-center border border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50"
                                   />
                                 </td>
-                                <td className="py-2 px-2 text-center">
-                                  <span className="font-bold text-blue-600 dark:text-blue-400">
-                                    {score.line1 + score.line2 + score.line3}
-                                  </span>
+                                <td className="py-2 px-2">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max="900"
+                                    value={score.line1 + score.line2 + score.line3}
+                                    onChange={(e) =>
+                                      updateTotalScore(
+                                        matchup.id,
+                                        'teamB',
+                                        index,
+                                        parseInt(e.target.value) || 0
+                                      )
+                                    }
+                                    className="w-20 px-2 py-1 text-center border border-blue-300 dark:border-blue-700 rounded bg-blue-50 dark:bg-blue-950 text-blue-900 dark:text-blue-100 font-bold"
+                                  />
                                 </td>
                                 <td className="py-2 px-2">
                                   <input
