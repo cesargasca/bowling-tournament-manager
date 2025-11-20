@@ -42,10 +42,16 @@ export const updateTeamSchema = z.object({
 // Player validations
 export const createPlayerSchema = z.object({
   name: z.string().min(1, 'Name is required').max(255, 'Name is too long'),
+  email: z.string().email('Invalid email address').optional().or(z.literal('')),
+  phone: z.string().max(20, 'Phone number is too long').optional().or(z.literal('')),
+  initialHandicap: z.number().int().min(0, 'Handicap cannot be negative').max(100, 'Handicap cannot exceed 100').default(0),
 })
 
 export const updatePlayerSchema = z.object({
-  name: z.string().min(1, 'Name is required').max(255, 'Name is too long'),
+  name: z.string().min(1, 'Name is required').max(255, 'Name is too long').optional(),
+  email: z.string().email('Invalid email address').optional().or(z.literal('')).nullable(),
+  phone: z.string().max(20, 'Phone number is too long').optional().or(z.literal('')).nullable(),
+  initialHandicap: z.number().int().min(0, 'Handicap cannot be negative').max(100, 'Handicap cannot exceed 100').optional(),
 })
 
 // Session validations
