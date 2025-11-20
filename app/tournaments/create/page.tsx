@@ -16,6 +16,7 @@ interface CSVRow {
   phone?: string;
   handicap?: string;
   category?: string;
+  substitute?: string;
 }
 
 export default function CreateTournamentPage() {
@@ -29,6 +30,7 @@ export default function CreateTournamentPage() {
   const [tournamentName, setTournamentName] = useState('');
   const [selectedBowlingId, setSelectedBowlingId] = useState('');
   const [teamSize, setTeamSize] = useState('4');
+  const [substituteCount, setSubstituteCount] = useState('0');
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvData, setCsvData] = useState<CSVRow[]>([]);
   const [csvPreview, setCsvPreview] = useState<string>('');
@@ -62,7 +64,7 @@ export default function CreateTournamentPage() {
 
     // Validate headers
     const requiredHeaders = ['team name', 'player name'];
-    const optionalHeaders = ['group', 'email', 'phone', 'handicap', 'category'];
+    const optionalHeaders = ['group', 'email', 'phone', 'handicap', 'category', 'substitute'];
     const allHeaders = [...requiredHeaders, ...optionalHeaders];
 
     for (const header of requiredHeaders) {
@@ -93,6 +95,7 @@ export default function CreateTournamentPage() {
         phone: row['phone'] || '',
         handicap: row['handicap'] || '',
         category: row['category'] || '',
+        substitute: row['substitute'] || '',
       });
     }
 
@@ -112,19 +115,30 @@ export default function CreateTournamentPage() {
       setCsvData(parsed);
 
       // Generate preview
-      const teamMap = new Map<string, { group?: string; count: number }>();
+      const isSubstitute = (value?: string): boolean => {
+        if (!value) return false;
+        const normalized = value.trim().toLowerCase();
+        return normalized === 's' || normalized === 'substitute' || normalized === 'yes' || normalized === 'true' || normalized === '1';
+      };
+
+      const teamMap = new Map<string, { group?: string; regularCount: number; substituteCount: number }>();
       parsed.forEach(row => {
         if (!teamMap.has(row.teamName)) {
-          teamMap.set(row.teamName, { group: row.group, count: 0 });
+          teamMap.set(row.teamName, { group: row.group, regularCount: 0, substituteCount: 0 });
         }
         const entry = teamMap.get(row.teamName)!;
-        entry.count++;
+        if (isSubstitute(row.substitute)) {
+          entry.substituteCount++;
+        } else {
+          entry.regularCount++;
+        }
       });
 
       const preview = Array.from(teamMap.entries())
         .map(([team, data]) => {
           const groupText = data.group ? ` (Group: ${data.group})` : '';
-          return `${team}${groupText}: ${data.count} players`;
+          const subsText = data.substituteCount > 0 ? ` + ${data.substituteCount} substitute${data.substituteCount > 1 ? 's' : ''}` : '';
+          return `${team}${groupText}: ${data.regularCount} player${data.regularCount > 1 ? 's' : ''}${subsText}`;
         })
         .join('\n');
 
@@ -167,6 +181,7 @@ export default function CreateTournamentPage() {
           name: tournamentName,
           bowlingId: parseInt(selectedBowlingId),
           teamSize: parseInt(teamSize),
+          substituteCount: parseInt(substituteCount),
         }),
       });
 
@@ -296,6 +311,23 @@ export default function CreateTournamentPage() {
                   Each team in this tournament will require exactly {teamSize} player{teamSize !== '1' ? 's' : ''}. This cannot be changed later.
                 </p>
               </div>
+
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                  Substitutes per Team
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="10"
+                  value={substituteCount}
+                  onChange={(e) => setSubstituteCount(e.target.value)}
+                  className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50"
+                />
+                <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">
+                  Number of substitute players allowed per team (0-{substituteCount}). Mark substitutes with "S" or "Substitute" in the CSV Substitute column.
+                </p>
+              </div>
             </div>
           </div>
 
@@ -322,7 +354,7 @@ export default function CreateTournamentPage() {
                 />
                 <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-500">
                   Required columns: Team Name, Player Name<br />
-                  Optional columns: Group, Email, Phone, Handicap, Category
+                  Optional columns: Group, Email, Phone, Handicap, Category, Substitute
                 </p>
               </div>
 
@@ -351,23 +383,29 @@ export default function CreateTournamentPage() {
                   Example CSV format:
                 </p>
                 <pre className="text-xs text-zinc-600 dark:text-zinc-400 overflow-x-auto">
-{`Team Name,Group,Player Name,Email,Phone,Handicap,Category
-Team 1,Group A,John Doe,john@example.com,555-1234,25,A League
-Team 1,Group A,Jane Smith,,,30,A League
-Team 1,Group A,Bob Wilson,bob@example.com,,15,B League
-Team 1,Group A,Alice Brown,,,22,A League
-Team 2,Group A,Mike Davis,mike@example.com,555-5678,18,B League
-Team 2,Group A,Sarah Miller,sarah@example.com,,35,A League
-Team 2,Group A,Tom Garcia,,,20,B League
-Team 2,Group A,Linda Martinez,,,28,A League
-Team 3,Group B,Chris Johnson,,,19,B League
-Team 3,Group B,Pat Lee,pat@example.com,555-9012,26,A League`}
+{`Team Name,Group,Player Name,Email,Phone,Handicap,Category,Substitute
+Team 1,Group A,John Doe,john@example.com,555-1234,25,A League,
+Team 1,Group A,Jane Smith,,,30,A League,
+Team 1,Group A,Bob Wilson,bob@example.com,,15,B League,
+Team 1,Group A,Alice Brown,,,22,A League,
+Team 1,Group A,Steve Backup,,,20,A League,S
+Team 2,Group A,Mike Davis,mike@example.com,555-5678,18,B League,
+Team 2,Group A,Sarah Miller,sarah@example.com,,35,A League,
+Team 2,Group A,Tom Garcia,,,20,B League,
+Team 2,Group A,Linda Martinez,,,28,A League,
+Team 2,Group A,Joe Reserve,,,25,B League,Substitute
+Team 3,Group B,Chris Johnson,,,19,B League,
+Team 3,Group B,Pat Lee,pat@example.com,555-9012,26,A League,
+Team 3,Group B,Sam Brown,,,22,A League,
+Team 3,Group B,Alex Green,,,24,B League,
+Team 3,Group B,Max Extra,,,18,B League,Yes`}
                 </pre>
                 <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-500">
                   <strong>Notes:</strong><br />
                   • All players must belong to a team (no standalone players allowed)<br />
                   • Group: Optional, used to organize teams (e.g., "Group A", "Group B")<br />
                   • Category: Optional, used to classify players (e.g., "A League", "B League")<br />
+                  • Substitute: Mark with "S", "Substitute", "Yes", "1", or "true" (case-insensitive). Leave blank for regular players<br />
                   • Groups and categories will be created automatically if they don't exist
                 </p>
               </div>

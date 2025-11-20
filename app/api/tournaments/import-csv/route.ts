@@ -10,6 +10,7 @@ interface CSVRow {
   phone?: string
   handicap?: string
   category?: string
+  substitute?: string
 }
 
 // POST /api/tournaments/import-csv - Import teams and players from CSV
@@ -50,8 +51,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Helper function to check if player is a substitute
+    const isSubstitute = (value?: string): boolean => {
+      if (!value) return false
+      const normalized = value.trim().toLowerCase()
+      return normalized === 's' || normalized === 'substitute' || normalized === 'yes' || normalized === 'true' || normalized === '1'
+    }
+
     // Group players by team
-    const teamMap = new Map<string, { group?: string; players: CSVRow[] }>()
+    const teamMap = new Map<string, { group?: string; players: CSVRow[]; substitutes: CSVRow[] }>()
 
     for (const row of csvData) {
       if (!row.teamName || !row.playerName) {
@@ -59,16 +67,29 @@ export async function POST(request: NextRequest) {
       }
 
       if (!teamMap.has(row.teamName)) {
-        teamMap.set(row.teamName, { group: row.group, players: [] })
+        teamMap.set(row.teamName, { group: row.group, players: [], substitutes: [] })
       }
-      teamMap.get(row.teamName)!.players.push(row)
+
+      const teamData = teamMap.get(row.teamName)!
+      if (isSubstitute(row.substitute)) {
+        teamData.substitutes.push(row)
+      } else {
+        teamData.players.push(row)
+      }
     }
 
     // Validate team sizes match tournament configuration
     const invalidTeams: string[] = []
     for (const [teamName, data] of teamMap.entries()) {
-      if (data.players.length !== tournament.teamSize) {
-        invalidTeams.push(`${teamName} (has ${data.players.length} players, needs ${tournament.teamSize})`)
+      const regularPlayerCount = data.players.length
+      const substitutePlayerCount = data.substitutes.length
+
+      if (regularPlayerCount !== tournament.teamSize) {
+        invalidTeams.push(`${teamName} (has ${regularPlayerCount} regular players, needs ${tournament.teamSize})`)
+      }
+
+      if (substitutePlayerCount > tournament.substituteCount) {
+        invalidTeams.push(`${teamName} (has ${substitutePlayerCount} substitutes, maximum allowed is ${tournament.substituteCount})`)
       }
     }
 
@@ -164,8 +185,8 @@ export async function POST(request: NextRequest) {
 
         createdTeams.push(team)
 
-        // Process each player
-        for (const playerData of data.players) {
+        // Helper function to process a player
+        const processPlayer = async (playerData: CSVRow, isSubstitute: boolean) => {
           const playerName = playerData.playerName.trim()
           const email = playerData.email?.trim() || null
           const phone = playerData.phone?.trim() || null
@@ -210,6 +231,7 @@ export async function POST(request: NextRequest) {
             data: {
               teamId: team.id,
               playerId: player.id,
+              isReplacement: isSubstitute,
             },
           })
 
@@ -238,6 +260,16 @@ export async function POST(request: NextRequest) {
               })
             }
           }
+        }
+
+        // Process regular players
+        for (const playerData of data.players) {
+          await processPlayer(playerData, false)
+        }
+
+        // Process substitute players
+        for (const playerData of data.substitutes) {
+          await processPlayer(playerData, true)
         }
       }
 

@@ -25,6 +25,7 @@ model Tournament {
   name                     String
   bowlingId                Int
   teamSize                 Int                       @default(4) // Number of players per team
+  substituteCount          Int                       @default(0) // Number of substitutes allowed per team
   bowling                  Bowling                   @relation(fields: [bowlingId], references: [id])
   sessions                 Session[]
   teams                    Team[]
