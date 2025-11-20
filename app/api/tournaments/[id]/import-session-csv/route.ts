@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { parse } from 'csv-parse/sync'
-import prisma from '@/lib/prisma'
+import { prisma } from '@/lib/prisma'
 import { successResponse, handleApiError, errorResponse } from '@/lib/utils/api'
 
 interface SessionRow {
