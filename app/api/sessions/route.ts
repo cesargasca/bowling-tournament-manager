@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
 
     const sessions = await prisma.session.findMany({
       where,
-      orderBy: { sessionDate: 'desc' },
+      orderBy: { sessionDate: 'asc' },
       include: {
         tournament: {
           select: {
@@ -25,8 +25,24 @@ export async function GET(request: NextRequest) {
         sessionMatchups: {
           include: {
             lane: true,
-            teamA: true,
-            teamB: true,
+            teamA: {
+              include: {
+                _count: {
+                  select: {
+                    teamPlayers: true,
+                  },
+                },
+              },
+            },
+            teamB: {
+              include: {
+                _count: {
+                  select: {
+                    teamPlayers: true,
+                  },
+                },
+              },
+            },
           },
         },
         _count: {
@@ -60,8 +76,24 @@ export async function POST(request: NextRequest) {
         sessionMatchups: {
           include: {
             lane: true,
-            teamA: true,
-            teamB: true,
+            teamA: {
+              include: {
+                _count: {
+                  select: {
+                    teamPlayers: true,
+                  },
+                },
+              },
+            },
+            teamB: {
+              include: {
+                _count: {
+                  select: {
+                    teamPlayers: true,
+                  },
+                },
+              },
+            },
           },
         },
       },

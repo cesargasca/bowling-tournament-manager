@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { successResponse, handleApiError, validateRequest } from '@/lib/utils/api'
+import { successResponse, errorResponse, handleApiError, validateRequest } from '@/lib/utils/api'
 import { createSessionMatchupSchema } from '@/lib/validations'
 
 // GET /api/session-matchups - List all session matchups
@@ -62,6 +62,33 @@ export async function POST(request: NextRequest) {
   if (!validation.success) return validation.response
 
   try {
+    const { sessionId, laneId } = validation.data
+
+    // Get the lane to check its opponent
+    const lane = await prisma.lane.findUnique({
+      where: { id: laneId },
+      select: { opponentLaneId: true },
+    })
+
+    if (!lane) {
+      return errorResponse('Lane not found', 404)
+    }
+
+    // Check if this lane or its opponent lane is already assigned in this session
+    const existingMatchups = await prisma.sessionMatchup.findMany({
+      where: {
+        sessionId,
+        OR: [
+          { laneId },
+          ...(lane.opponentLaneId ? [{ laneId: lane.opponentLaneId }] : []),
+        ],
+      },
+    })
+
+    if (existingMatchups.length > 0) {
+      return errorResponse('This lane pair already has a matchup in this session', 400)
+    }
+
     const matchup = await prisma.sessionMatchup.create({
       data: validation.data,
       include: {

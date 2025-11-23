@@ -270,6 +270,29 @@ export default function SessionDetailPage() {
     }
   };
 
+  const handleDeleteMatchup = async (matchupId: number, laneNumber: number, opponentLaneNumber: number | undefined) => {
+    if (!confirm(`Are you sure you want to delete the matchup for Lane ${laneNumber} vs Lane ${opponentLaneNumber}? This will remove all scores associated with this matchup.`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/session-matchups/${matchupId}`, {
+        method: 'DELETE',
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        fetchSessionData();
+      } else {
+        alert(result.error || 'Failed to delete matchup');
+      }
+    } catch (err) {
+      console.error('Failed to delete matchup:', err);
+      alert('Failed to delete matchup');
+    }
+  };
+
   const updateScore = (
     matchupId: number,
     team: 'teamA' | 'teamB',
@@ -284,6 +307,39 @@ export default function SessionDetailPage() {
       }
       const scores = [...updated[matchupId][team]];
       (scores[index] as any)[field] = value;
+      updated[matchupId] = {
+        ...updated[matchupId],
+        [team]: scores,
+      };
+      return updated;
+    });
+  };
+
+  const updateTotalScore = (
+    matchupId: number,
+    team: 'teamA' | 'teamB',
+    index: number,
+    total: number
+  ) => {
+    setMatchupScores((prev) => {
+      const updated = { ...prev };
+      if (!updated[matchupId]) {
+        updated[matchupId] = { teamA: [], teamB: [] };
+      }
+      const scores = [...updated[matchupId][team]];
+      const currentScore = scores[index];
+
+      // Distribute total evenly across three lines
+      const perLine = Math.floor(total / 3);
+      const remainder = total % 3;
+
+      scores[index] = {
+        ...currentScore,
+        line1: perLine + (remainder > 0 ? 1 : 0),
+        line2: perLine + (remainder > 1 ? 1 : 0),
+        line3: perLine,
+      };
+
       updated[matchupId] = {
         ...updated[matchupId],
         [team]: scores,
@@ -358,8 +414,15 @@ export default function SessionDetailPage() {
   }
 
   // Find lanes that don't have matchups yet
+  // Exclude both lanes that are directly assigned AND lanes whose opponent is assigned
   const assignedLaneIds = session.sessionMatchups.map((m) => m.laneId);
-  const unassignedLanes = lanes.filter((lane) => !assignedLaneIds.includes(lane.id));
+  const assignedOpponentLaneIds = session.sessionMatchups
+    .map((m) => m.lane.opponentLaneId)
+    .filter((id): id is number => id !== null);
+
+  const unassignedLanes = lanes.filter(
+    (lane) => !assignedLaneIds.includes(lane.id) && !assignedOpponentLaneIds.includes(lane.id)
+  );
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
@@ -431,9 +494,17 @@ export default function SessionDetailPage() {
               >
                 {/* Matchup Header */}
                 <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50">
-                  <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50 mb-3">
-                    Lane {matchup.lane.laneNumber} vs Lane {matchup.lane.opponentLane?.laneNumber}
-                  </h2>
+                  <div className="flex items-center justify-between mb-3">
+                    <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
+                      Lane {matchup.lane.laneNumber} vs Lane {matchup.lane.opponentLane?.laneNumber}
+                    </h2>
+                    <button
+                      onClick={() => handleDeleteMatchup(matchup.id, matchup.lane.laneNumber, matchup.lane.opponentLane?.laneNumber)}
+                      className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                    >
+                      Delete Matchup
+                    </button>
+                  </div>
 
                   {/* Team Selection */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -588,10 +659,22 @@ export default function SessionDetailPage() {
                                     className="w-16 px-2 py-1 text-center border border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50"
                                   />
                                 </td>
-                                <td className="py-2 px-2 text-center">
-                                  <span className="font-bold text-blue-600 dark:text-blue-400">
-                                    {score.line1 + score.line2 + score.line3}
-                                  </span>
+                                <td className="py-2 px-2">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max="900"
+                                    value={score.line1 + score.line2 + score.line3}
+                                    onChange={(e) =>
+                                      updateTotalScore(
+                                        matchup.id,
+                                        'teamA',
+                                        index,
+                                        parseInt(e.target.value) || 0
+                                      )
+                                    }
+                                    className="w-20 px-2 py-1 text-center border border-blue-300 dark:border-blue-700 rounded bg-blue-50 dark:bg-blue-950 text-blue-900 dark:text-blue-100 font-bold"
+                                  />
                                 </td>
                                 <td className="py-2 px-2">
                                   <input
@@ -736,10 +819,22 @@ export default function SessionDetailPage() {
                                     className="w-16 px-2 py-1 text-center border border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50"
                                   />
                                 </td>
-                                <td className="py-2 px-2 text-center">
-                                  <span className="font-bold text-blue-600 dark:text-blue-400">
-                                    {score.line1 + score.line2 + score.line3}
-                                  </span>
+                                <td className="py-2 px-2">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max="900"
+                                    value={score.line1 + score.line2 + score.line3}
+                                    onChange={(e) =>
+                                      updateTotalScore(
+                                        matchup.id,
+                                        'teamB',
+                                        index,
+                                        parseInt(e.target.value) || 0
+                                      )
+                                    }
+                                    className="w-20 px-2 py-1 text-center border border-blue-300 dark:border-blue-700 rounded bg-blue-50 dark:bg-blue-950 text-blue-900 dark:text-blue-100 font-bold"
+                                  />
                                 </td>
                                 <td className="py-2 px-2">
                                   <input
