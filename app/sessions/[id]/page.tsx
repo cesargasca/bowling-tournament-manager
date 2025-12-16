@@ -6,6 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 interface Session {
   id: number;
   sessionDate: string;
+  completed: boolean;
   tournament: {
     id: number;
     name: string;
@@ -114,6 +115,30 @@ interface MatchupScores {
   };
 }
 
+type InputMode = 'standard' | 'cumulative';
+
+interface PlayerPreviousTotal {
+  teamPlayerId: number;
+  playerId: number;
+  playerName: string;
+  cumulativeTotal: number;
+  sessionCount: number;
+}
+
+interface CumulativeInputState {
+  [teamPlayerId: number]: number; // New cumulative total input
+}
+
+interface CompletionStatus {
+  canEdit: boolean;
+  reason: string;
+  previousSessionComplete: boolean | null;
+  previousSessionId?: number;
+  previousSessionDate?: string;
+  expectedPlayerCount?: number;
+  completedPlayerCount?: number;
+}
+
 export default function SessionDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -126,10 +151,46 @@ export default function SessionDetailPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [inputMode, setInputMode] = useState<InputMode>('standard');
+  const [previousTotals, setPreviousTotals] = useState<Record<number, PlayerPreviousTotal>>({});
+  const [cumulativeInputs, setCumulativeInputs] = useState<CumulativeInputState>({});
+  const [completionStatus, setCompletionStatus] = useState<CompletionStatus | null>(null);
 
   useEffect(() => {
     fetchSessionData();
+    fetchPreviousTotals();
+    fetchCompletionStatus();
   }, [sessionId]);
+
+  const fetchCompletionStatus = async () => {
+    try {
+      const response = await fetch(`/api/sessions/${sessionId}/completion-status`);
+      const result = await response.json();
+
+      if (result.success) {
+        setCompletionStatus(result.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch completion status:', err);
+    }
+  };
+
+  const fetchPreviousTotals = async () => {
+    try {
+      const response = await fetch(`/api/sessions/${sessionId}/previous-totals`);
+      const result = await response.json();
+
+      if (result.success) {
+        const totalsMap: Record<number, PlayerPreviousTotal> = {};
+        result.data.playerTotals.forEach((pt: PlayerPreviousTotal) => {
+          totalsMap[pt.teamPlayerId] = pt;
+        });
+        setPreviousTotals(totalsMap);
+      }
+    } catch (err) {
+      console.error('Failed to fetch previous totals:', err);
+    }
+  };
 
   const fetchSessionData = async () => {
     try {
@@ -348,6 +409,53 @@ export default function SessionDetailPage() {
     });
   };
 
+  const updateCumulativeTotal = (
+    matchupId: number,
+    team: 'teamA' | 'teamB',
+    index: number,
+    teamPlayerId: number,
+    newCumulativeTotal: number
+  ) => {
+    // Update the cumulative input state
+    setCumulativeInputs((prev) => ({
+      ...prev,
+      [teamPlayerId]: newCumulativeTotal,
+    }));
+
+    // Calculate the session score as difference
+    const previousTotal = previousTotals[teamPlayerId]?.cumulativeTotal || 0;
+    const sessionTotal = Math.max(0, newCumulativeTotal - previousTotal);
+
+    // Update the matchup scores with the calculated session total
+    updateTotalScore(matchupId, team, index, sessionTotal);
+  };
+
+  const handleToggleCompletion = async () => {
+    try {
+      const newCompletedStatus = !session?.completed;
+
+      const response = await fetch(`/api/sessions/${sessionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          completed: newCompletedStatus,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        fetchSessionData();
+        alert(newCompletedStatus ? 'Session marked as complete!' : 'Session marked as incomplete');
+      } else {
+        alert(result.error || 'Failed to update session');
+      }
+    } catch (err) {
+      console.error('Failed to toggle completion:', err);
+      alert('Failed to update session');
+    }
+  };
+
   const handleSaveScores = async () => {
     try {
       setSaving(true);
@@ -451,12 +559,99 @@ export default function SessionDetailPage() {
             {session.sessionMatchups.length} match{session.sessionMatchups.length !== 1 ? 'es' : ''}{' '}
             configured
           </p>
+
+          {/* Session Completion Status */}
+          {completionStatus?.canEdit !== false && (
+            <div className="mt-4 flex items-center gap-3">
+              <button
+                onClick={handleToggleCompletion}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  session.completed
+                    ? 'bg-green-600 text-white hover:bg-green-700'
+                    : 'bg-amber-600 text-white hover:bg-amber-700'
+                }`}
+              >
+                {session.completed ? '✓ Session Complete' : '○ Mark as Complete'}
+              </button>
+              <span className="text-sm text-zinc-500 dark:text-zinc-400">
+                {session.completed
+                  ? 'This session is complete. Next session can be edited.'
+                  : 'Mark this session complete to unlock the next session.'}
+              </span>
+            </div>
+          )}
+
+          {/* Input Mode Toggle */}
+          <div className="mt-4 flex items-center gap-4">
+            <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              Score Entry Mode:
+            </span>
+            <div className="inline-flex rounded-lg border border-zinc-300 dark:border-zinc-700 overflow-hidden">
+              <button
+                onClick={() => setInputMode('standard')}
+                className={`px-4 py-2 text-sm font-medium transition-colors ${
+                  inputMode === 'standard'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700'
+                }`}
+              >
+                Standard (Lines/Total)
+              </button>
+              <button
+                onClick={() => setInputMode('cumulative')}
+                className={`px-4 py-2 text-sm font-medium transition-colors ${
+                  inputMode === 'cumulative'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700'
+                }`}
+              >
+                Cumulative Total
+              </button>
+            </div>
+            {inputMode === 'cumulative' && (
+              <span className="text-xs text-zinc-500 dark:text-zinc-500 italic">
+                Enter total pins from first session to current session
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        {/* Session Locked Warning */}
+        {completionStatus && !completionStatus.canEdit && (
+          <div className="bg-red-50 dark:bg-red-950/20 border-2 border-red-500 dark:border-red-700 rounded-lg p-6">
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0">
+                <svg className="w-8 h-8 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-xl font-bold text-red-900 dark:text-red-100 mb-1">
+                  🚫 SESSION NOT AVAILABLE TO EDIT
+                </h3>
+                <p className="text-base font-semibold text-red-900 dark:text-red-100 mb-2">
+                  Previous Session Must Be Completed First
+                </p>
+                <p className="text-red-800 dark:text-red-200 mb-3">
+                  {completionStatus.reason}
+                </p>
+                {completionStatus.previousSessionId && (
+                  <button
+                    onClick={() => router.push(`/sessions/${completionStatus.previousSessionId}`)}
+                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                  >
+                    Go to Previous Session →
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Add Matchup Section */}
-        {unassignedLanes.length > 0 && (
+        {unassignedLanes.length > 0 && completionStatus?.canEdit !== false && (
           <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg p-4">
             <h3 className="font-semibold text-zinc-900 dark:text-zinc-50 mb-3">
               Add Lane Matchup
@@ -500,7 +695,8 @@ export default function SessionDetailPage() {
                     </h2>
                     <button
                       onClick={() => handleDeleteMatchup(matchup.id, matchup.lane.laneNumber, matchup.lane.opponentLane?.laneNumber)}
-                      className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                      disabled={completionStatus?.canEdit === false}
+                      className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Delete Matchup
                     </button>
@@ -521,7 +717,8 @@ export default function SessionDetailPage() {
                             matchup.teamBId
                           )
                         }
-                        className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50"
+                        disabled={completionStatus?.canEdit === false}
+                        className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <option value="">Select team...</option>
                         {teams.map((team) => (
@@ -545,7 +742,8 @@ export default function SessionDetailPage() {
                             e.target.value ? parseInt(e.target.value) : null
                           )
                         }
-                        className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50"
+                        disabled={completionStatus?.canEdit === false}
+                        className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <option value="">Select team...</option>
                         {teams.map((team) => (
@@ -576,18 +774,35 @@ export default function SessionDetailPage() {
                               <th className="text-left py-2 px-3 text-zinc-700 dark:text-zinc-300 font-semibold">
                                 Player
                               </th>
-                              <th className="text-center py-2 px-2 text-zinc-700 dark:text-zinc-300 font-semibold">
-                                L1
-                              </th>
-                              <th className="text-center py-2 px-2 text-zinc-700 dark:text-zinc-300 font-semibold">
-                                L2
-                              </th>
-                              <th className="text-center py-2 px-2 text-zinc-700 dark:text-zinc-300 font-semibold">
-                                L3
-                              </th>
-                              <th className="text-center py-2 px-2 text-zinc-700 dark:text-zinc-300 font-semibold">
-                                Total
-                              </th>
+                              {inputMode === 'standard' && (
+                                <>
+                                  <th className="text-center py-2 px-2 text-zinc-700 dark:text-zinc-300 font-semibold">
+                                    L1
+                                  </th>
+                                  <th className="text-center py-2 px-2 text-zinc-700 dark:text-zinc-300 font-semibold">
+                                    L2
+                                  </th>
+                                  <th className="text-center py-2 px-2 text-zinc-700 dark:text-zinc-300 font-semibold">
+                                    L3
+                                  </th>
+                                  <th className="text-center py-2 px-2 text-zinc-700 dark:text-zinc-300 font-semibold">
+                                    Total
+                                  </th>
+                                </>
+                              )}
+                              {inputMode === 'cumulative' && (
+                                <>
+                                  <th className="text-center py-2 px-3 text-zinc-700 dark:text-zinc-300 font-semibold">
+                                    Prev Total
+                                  </th>
+                                  <th className="text-center py-2 px-3 text-zinc-700 dark:text-zinc-300 font-semibold">
+                                    New Cumulative
+                                  </th>
+                                  <th className="text-center py-2 px-3 text-zinc-700 dark:text-zinc-300 font-semibold">
+                                    Session Score
+                                  </th>
+                                </>
+                              )}
                               <th className="text-center py-2 px-2 text-zinc-700 dark:text-zinc-300 font-semibold">
                                 HC
                               </th>
@@ -600,82 +815,128 @@ export default function SessionDetailPage() {
                             </tr>
                           </thead>
                           <tbody>
-                            {matchupScores[matchup.id].teamA.map((score, index) => (
+                            {matchupScores[matchup.id].teamA.map((score, index) => {
+                              const prevTotal = previousTotals[score.teamPlayerId]?.cumulativeTotal || 0;
+                              const sessionTotal = score.line1 + score.line2 + score.line3;
+                              const cumulativeInput = cumulativeInputs[score.teamPlayerId] || prevTotal + sessionTotal;
+                              const isLocked = completionStatus?.canEdit === false;
+
+                              return (
                               <tr key={index} className="border-b border-zinc-100 dark:border-zinc-800">
                                 <td className="py-2 px-3 text-zinc-900 dark:text-zinc-50 font-medium">
                                   {score.playerName}
                                 </td>
-                                <td className="py-2 px-2">
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    max="300"
-                                    value={score.line1}
-                                    onChange={(e) =>
-                                      updateScore(
-                                        matchup.id,
-                                        'teamA',
-                                        index,
-                                        'line1',
-                                        parseInt(e.target.value) || 0
-                                      )
-                                    }
-                                    className="w-16 px-2 py-1 text-center border border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50"
-                                  />
-                                </td>
-                                <td className="py-2 px-2">
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    max="300"
-                                    value={score.line2}
-                                    onChange={(e) =>
-                                      updateScore(
-                                        matchup.id,
-                                        'teamA',
-                                        index,
-                                        'line2',
-                                        parseInt(e.target.value) || 0
-                                      )
-                                    }
-                                    className="w-16 px-2 py-1 text-center border border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50"
-                                  />
-                                </td>
-                                <td className="py-2 px-2">
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    max="300"
-                                    value={score.line3}
-                                    onChange={(e) =>
-                                      updateScore(
-                                        matchup.id,
-                                        'teamA',
-                                        index,
-                                        'line3',
-                                        parseInt(e.target.value) || 0
-                                      )
-                                    }
-                                    className="w-16 px-2 py-1 text-center border border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50"
-                                  />
-                                </td>
-                                <td className="py-2 px-2">
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    max="900"
-                                    value={score.line1 + score.line2 + score.line3}
-                                    onChange={(e) =>
-                                      updateTotalScore(
-                                        matchup.id,
-                                        'teamA',
-                                        index,
-                                        parseInt(e.target.value) || 0
-                                      )
-                                    }
-                                    className="w-20 px-2 py-1 text-center border border-blue-300 dark:border-blue-700 rounded bg-blue-50 dark:bg-blue-950 text-blue-900 dark:text-blue-100 font-bold"
-                                  />
-                                </td>
+                                {inputMode === 'standard' && (
+                                  <>
+                                    <td className="py-2 px-2">
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        max="300"
+                                        value={score.line1}
+                                        onChange={(e) =>
+                                          updateScore(
+                                            matchup.id,
+                                            'teamA',
+                                            index,
+                                            'line1',
+                                            parseInt(e.target.value) || 0
+                                          )
+                                        }
+                                        disabled={isLocked}
+                                        className="w-16 px-2 py-1 text-center border border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                      />
+                                    </td>
+                                    <td className="py-2 px-2">
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        max="300"
+                                        value={score.line2}
+                                        onChange={(e) =>
+                                          updateScore(
+                                            matchup.id,
+                                            'teamA',
+                                            index,
+                                            'line2',
+                                            parseInt(e.target.value) || 0
+                                          )
+                                        }
+                                        disabled={isLocked}
+                                        className="w-16 px-2 py-1 text-center border border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                      />
+                                    </td>
+                                    <td className="py-2 px-2">
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        max="300"
+                                        value={score.line3}
+                                        onChange={(e) =>
+                                          updateScore(
+                                            matchup.id,
+                                            'teamA',
+                                            index,
+                                            'line3',
+                                            parseInt(e.target.value) || 0
+                                          )
+                                        }
+                                        disabled={isLocked}
+                                        className="w-16 px-2 py-1 text-center border border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                      />
+                                    </td>
+                                    <td className="py-2 px-2">
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        max="900"
+                                        value={score.line1 + score.line2 + score.line3}
+                                        onChange={(e) =>
+                                          updateTotalScore(
+                                            matchup.id,
+                                            'teamA',
+                                            index,
+                                            parseInt(e.target.value) || 0
+                                          )
+                                        }
+                                        disabled={isLocked}
+                                        className="w-20 px-2 py-1 text-center border border-blue-300 dark:border-blue-700 rounded bg-blue-50 dark:bg-blue-950 text-blue-900 dark:text-blue-100 font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                                      />
+                                    </td>
+                                  </>
+                                )}
+                                {inputMode === 'cumulative' && (
+                                  <>
+                                    <td className="py-2 px-3 text-center">
+                                      <div className="px-3 py-1 bg-zinc-100 dark:bg-zinc-800 rounded text-zinc-700 dark:text-zinc-300 font-medium">
+                                        {prevTotal}
+                                      </div>
+                                    </td>
+                                    <td className="py-2 px-3">
+                                      <input
+                                        type="number"
+                                        min={prevTotal}
+                                        value={cumulativeInput}
+                                        onChange={(e) =>
+                                          updateCumulativeTotal(
+                                            matchup.id,
+                                            'teamA',
+                                            index,
+                                            score.teamPlayerId,
+                                            parseInt(e.target.value) || prevTotal
+                                          )
+                                        }
+                                        disabled={isLocked}
+                                        className="w-24 px-2 py-1 text-center border border-blue-300 dark:border-blue-700 rounded bg-blue-50 dark:bg-blue-950 text-blue-900 dark:text-blue-100 font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                                      />
+                                    </td>
+                                    <td className="py-2 px-3 text-center">
+                                      <div className="px-3 py-1 bg-green-100 dark:bg-green-950 rounded text-green-700 dark:text-green-300 font-bold">
+                                        {sessionTotal}
+                                      </div>
+                                    </td>
+                                  </>
+                                )}
                                 <td className="py-2 px-2">
                                   <input
                                     type="number"
@@ -691,7 +952,8 @@ export default function SessionDetailPage() {
                                         parseInt(e.target.value) || 0
                                       )
                                     }
-                                    className="w-16 px-2 py-1 text-center border border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50"
+                                    disabled={isLocked}
+                                    className="w-16 px-2 py-1 text-center border border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed"
                                   />
                                 </td>
                                 <td className="py-2 px-2 text-center">
@@ -701,7 +963,8 @@ export default function SessionDetailPage() {
                                     onChange={(e) =>
                                       updateScore(matchup.id, 'teamA', index, 'assistance', e.target.checked)
                                     }
-                                    className="w-4 h-4 text-blue-600 border-zinc-300 rounded focus:ring-blue-500"
+                                    disabled={isLocked}
+                                    className="w-4 h-4 text-blue-600 border-zinc-300 rounded focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                                   />
                                 </td>
                                 <td className="py-2 px-2 text-center">
@@ -711,11 +974,13 @@ export default function SessionDetailPage() {
                                     onChange={(e) =>
                                       updateScore(matchup.id, 'teamA', index, 'payment', e.target.checked)
                                     }
-                                    className="w-4 h-4 text-green-600 border-zinc-300 rounded focus:ring-green-500"
+                                    disabled={isLocked}
+                                    className="w-4 h-4 text-green-600 border-zinc-300 rounded focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
                                   />
                                 </td>
                               </tr>
-                            ))}
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
@@ -736,18 +1001,35 @@ export default function SessionDetailPage() {
                               <th className="text-left py-2 px-3 text-zinc-700 dark:text-zinc-300 font-semibold">
                                 Player
                               </th>
-                              <th className="text-center py-2 px-2 text-zinc-700 dark:text-zinc-300 font-semibold">
-                                L1
-                              </th>
-                              <th className="text-center py-2 px-2 text-zinc-700 dark:text-zinc-300 font-semibold">
-                                L2
-                              </th>
-                              <th className="text-center py-2 px-2 text-zinc-700 dark:text-zinc-300 font-semibold">
-                                L3
-                              </th>
-                              <th className="text-center py-2 px-2 text-zinc-700 dark:text-zinc-300 font-semibold">
-                                Total
-                              </th>
+                              {inputMode === 'standard' && (
+                                <>
+                                  <th className="text-center py-2 px-2 text-zinc-700 dark:text-zinc-300 font-semibold">
+                                    L1
+                                  </th>
+                                  <th className="text-center py-2 px-2 text-zinc-700 dark:text-zinc-300 font-semibold">
+                                    L2
+                                  </th>
+                                  <th className="text-center py-2 px-2 text-zinc-700 dark:text-zinc-300 font-semibold">
+                                    L3
+                                  </th>
+                                  <th className="text-center py-2 px-2 text-zinc-700 dark:text-zinc-300 font-semibold">
+                                    Total
+                                  </th>
+                                </>
+                              )}
+                              {inputMode === 'cumulative' && (
+                                <>
+                                  <th className="text-center py-2 px-3 text-zinc-700 dark:text-zinc-300 font-semibold">
+                                    Prev Total
+                                  </th>
+                                  <th className="text-center py-2 px-3 text-zinc-700 dark:text-zinc-300 font-semibold">
+                                    New Cumulative
+                                  </th>
+                                  <th className="text-center py-2 px-3 text-zinc-700 dark:text-zinc-300 font-semibold">
+                                    Session Score
+                                  </th>
+                                </>
+                              )}
                               <th className="text-center py-2 px-2 text-zinc-700 dark:text-zinc-300 font-semibold">
                                 HC
                               </th>
@@ -760,82 +1042,128 @@ export default function SessionDetailPage() {
                             </tr>
                           </thead>
                           <tbody>
-                            {matchupScores[matchup.id].teamB.map((score, index) => (
+                            {matchupScores[matchup.id].teamB.map((score, index) => {
+                              const prevTotal = previousTotals[score.teamPlayerId]?.cumulativeTotal || 0;
+                              const sessionTotal = score.line1 + score.line2 + score.line3;
+                              const cumulativeInput = cumulativeInputs[score.teamPlayerId] || prevTotal + sessionTotal;
+                              const isLocked = completionStatus?.canEdit === false;
+
+                              return (
                               <tr key={index} className="border-b border-zinc-100 dark:border-zinc-800">
                                 <td className="py-2 px-3 text-zinc-900 dark:text-zinc-50 font-medium">
                                   {score.playerName}
                                 </td>
-                                <td className="py-2 px-2">
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    max="300"
-                                    value={score.line1}
-                                    onChange={(e) =>
-                                      updateScore(
-                                        matchup.id,
-                                        'teamB',
-                                        index,
-                                        'line1',
-                                        parseInt(e.target.value) || 0
-                                      )
-                                    }
-                                    className="w-16 px-2 py-1 text-center border border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50"
-                                  />
-                                </td>
-                                <td className="py-2 px-2">
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    max="300"
-                                    value={score.line2}
-                                    onChange={(e) =>
-                                      updateScore(
-                                        matchup.id,
-                                        'teamB',
-                                        index,
-                                        'line2',
-                                        parseInt(e.target.value) || 0
-                                      )
-                                    }
-                                    className="w-16 px-2 py-1 text-center border border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50"
-                                  />
-                                </td>
-                                <td className="py-2 px-2">
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    max="300"
-                                    value={score.line3}
-                                    onChange={(e) =>
-                                      updateScore(
-                                        matchup.id,
-                                        'teamB',
-                                        index,
-                                        'line3',
-                                        parseInt(e.target.value) || 0
-                                      )
-                                    }
-                                    className="w-16 px-2 py-1 text-center border border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50"
-                                  />
-                                </td>
-                                <td className="py-2 px-2">
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    max="900"
-                                    value={score.line1 + score.line2 + score.line3}
-                                    onChange={(e) =>
-                                      updateTotalScore(
-                                        matchup.id,
-                                        'teamB',
-                                        index,
-                                        parseInt(e.target.value) || 0
-                                      )
-                                    }
-                                    className="w-20 px-2 py-1 text-center border border-blue-300 dark:border-blue-700 rounded bg-blue-50 dark:bg-blue-950 text-blue-900 dark:text-blue-100 font-bold"
-                                  />
-                                </td>
+                                {inputMode === 'standard' && (
+                                  <>
+                                    <td className="py-2 px-2">
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        max="300"
+                                        value={score.line1}
+                                        onChange={(e) =>
+                                          updateScore(
+                                            matchup.id,
+                                            'teamB',
+                                            index,
+                                            'line1',
+                                            parseInt(e.target.value) || 0
+                                          )
+                                        }
+                                        disabled={isLocked}
+                                        className="w-16 px-2 py-1 text-center border border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                      />
+                                    </td>
+                                    <td className="py-2 px-2">
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        max="300"
+                                        value={score.line2}
+                                        onChange={(e) =>
+                                          updateScore(
+                                            matchup.id,
+                                            'teamB',
+                                            index,
+                                            'line2',
+                                            parseInt(e.target.value) || 0
+                                          )
+                                        }
+                                        disabled={isLocked}
+                                        className="w-16 px-2 py-1 text-center border border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                      />
+                                    </td>
+                                    <td className="py-2 px-2">
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        max="300"
+                                        value={score.line3}
+                                        onChange={(e) =>
+                                          updateScore(
+                                            matchup.id,
+                                            'teamB',
+                                            index,
+                                            'line3',
+                                            parseInt(e.target.value) || 0
+                                          )
+                                        }
+                                        disabled={isLocked}
+                                        className="w-16 px-2 py-1 text-center border border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                      />
+                                    </td>
+                                    <td className="py-2 px-2">
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        max="900"
+                                        value={score.line1 + score.line2 + score.line3}
+                                        onChange={(e) =>
+                                          updateTotalScore(
+                                            matchup.id,
+                                            'teamB',
+                                            index,
+                                            parseInt(e.target.value) || 0
+                                          )
+                                        }
+                                        disabled={isLocked}
+                                        className="w-20 px-2 py-1 text-center border border-blue-300 dark:border-blue-700 rounded bg-blue-50 dark:bg-blue-950 text-blue-900 dark:text-blue-100 font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                                      />
+                                    </td>
+                                  </>
+                                )}
+                                {inputMode === 'cumulative' && (
+                                  <>
+                                    <td className="py-2 px-3 text-center">
+                                      <div className="px-3 py-1 bg-zinc-100 dark:bg-zinc-800 rounded text-zinc-700 dark:text-zinc-300 font-medium">
+                                        {prevTotal}
+                                      </div>
+                                    </td>
+                                    <td className="py-2 px-3">
+                                      <input
+                                        type="number"
+                                        min={prevTotal}
+                                        value={cumulativeInput}
+                                        onChange={(e) =>
+                                          updateCumulativeTotal(
+                                            matchup.id,
+                                            'teamB',
+                                            index,
+                                            score.teamPlayerId,
+                                            parseInt(e.target.value) || prevTotal
+                                          )
+                                        }
+                                        disabled={isLocked}
+                                        className="w-24 px-2 py-1 text-center border border-blue-300 dark:border-blue-700 rounded bg-blue-50 dark:bg-blue-950 text-blue-900 dark:text-blue-100 font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                                      />
+                                    </td>
+                                    <td className="py-2 px-3 text-center">
+                                      <div className="px-3 py-1 bg-green-100 dark:bg-green-950 rounded text-green-700 dark:text-green-300 font-bold">
+                                        {sessionTotal}
+                                      </div>
+                                    </td>
+                                  </>
+                                )}
                                 <td className="py-2 px-2">
                                   <input
                                     type="number"
@@ -851,7 +1179,8 @@ export default function SessionDetailPage() {
                                         parseInt(e.target.value) || 0
                                       )
                                     }
-                                    className="w-16 px-2 py-1 text-center border border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50"
+                                    disabled={isLocked}
+                                    className="w-16 px-2 py-1 text-center border border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed"
                                   />
                                 </td>
                                 <td className="py-2 px-2 text-center">
@@ -861,7 +1190,8 @@ export default function SessionDetailPage() {
                                     onChange={(e) =>
                                       updateScore(matchup.id, 'teamB', index, 'assistance', e.target.checked)
                                     }
-                                    className="w-4 h-4 text-blue-600 border-zinc-300 rounded focus:ring-blue-500"
+                                    disabled={isLocked}
+                                    className="w-4 h-4 text-blue-600 border-zinc-300 rounded focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                                   />
                                 </td>
                                 <td className="py-2 px-2 text-center">
@@ -871,11 +1201,13 @@ export default function SessionDetailPage() {
                                     onChange={(e) =>
                                       updateScore(matchup.id, 'teamB', index, 'payment', e.target.checked)
                                     }
-                                    className="w-4 h-4 text-green-600 border-zinc-300 rounded focus:ring-green-500"
+                                    disabled={isLocked}
+                                    className="w-4 h-4 text-green-600 border-zinc-300 rounded focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
                                   />
                                 </td>
                               </tr>
-                            ))}
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
@@ -893,10 +1225,10 @@ export default function SessionDetailPage() {
             <div className="flex justify-end sticky bottom-4">
               <button
                 onClick={handleSaveScores}
-                disabled={saving}
+                disabled={saving || completionStatus?.canEdit === false}
                 className="px-8 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
               >
-                {saving ? 'Saving...' : 'Save All Scores'}
+                {saving ? 'Saving...' : completionStatus?.canEdit === false ? 'Session Locked' : 'Save All Scores'}
               </button>
             </div>
           </>
