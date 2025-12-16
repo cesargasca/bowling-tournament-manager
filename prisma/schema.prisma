@@ -89,6 +89,7 @@ model Session {
   id                 Int                 @id @default(autoincrement())
   tournamentId       Int
   sessionDate        DateTime
+  completed          Boolean             @default(false)
   tournament         Tournament          @relation(fields: [tournamentId], references: [id])
   teamPlayerSessions TeamPlayerSession[]
   sessionMatchups    SessionMatchup[]

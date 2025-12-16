@@ -63,6 +63,75 @@ export async function GET(
   }
 }
 
+// PATCH /api/sessions/[id] - Update session (e.g., toggle completion)
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
+    const sessionId = parseInt(id)
+    const body = await request.json()
+
+    // If trying to mark session as complete, validate previous session is complete
+    if (body.completed === true) {
+      // Get the current session
+      const currentSession = await prisma.session.findUnique({
+        where: { id: sessionId },
+        select: {
+          id: true,
+          sessionDate: true,
+          tournamentId: true,
+        },
+      })
+
+      if (!currentSession) {
+        return errorResponse('Session not found', 404)
+      }
+
+      // Get all sessions in this tournament ordered by date
+      const allSessions = await prisma.session.findMany({
+        where: {
+          tournamentId: currentSession.tournamentId,
+        },
+        orderBy: {
+          sessionDate: 'asc',
+        },
+        select: {
+          id: true,
+          sessionDate: true,
+          completed: true,
+        },
+      })
+
+      // Find current session index
+      const currentIndex = allSessions.findIndex(s => s.id === sessionId)
+
+      // If not the first session, check if previous session is complete
+      if (currentIndex > 0) {
+        const previousSession = allSessions[currentIndex - 1]
+        if (!previousSession.completed) {
+          return errorResponse(
+            `Cannot mark session as complete. Previous session (${new Date(previousSession.sessionDate).toLocaleDateString()}) must be marked as complete first.`,
+            400
+          )
+        }
+      }
+    }
+
+    const session = await prisma.session.update({
+      where: { id: sessionId },
+      data: {
+        completed: body.completed,
+      },
+    })
+
+    return successResponse(session, 'Session updated successfully')
+  } catch (error) {
+    return handleApiError(error)
+  }
+}
+
 // DELETE /api/sessions/[id] - Delete session
 export async function DELETE(
   request: NextRequest,
